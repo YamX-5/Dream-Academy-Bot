@@ -594,8 +594,9 @@ def settings_page():
         "FROM groups g").fetchall()
     con.close()
     group_error = request.args.get("group_error", type=int)
+    shown_url = coach_access_url()
     return render_template("settings.html", st=st, saved=saved, groups=groups,
-                           all_days=list(DAY_AR.keys()), public_url=PUBLIC_URL["url"],
+                           all_days=list(DAY_AR.keys()), public_url=shown_url,
                            group_error=group_error)
 
 
@@ -674,14 +675,25 @@ def import_players():
 @app.route("/qr")
 @require_role("admin")
 def qr_page():
-    url = PUBLIC_URL["url"] or f"http://{get_local_ip()}:8000"
+    url = coach_access_url()
     import qrcode
     import base64
     img = qrcode.make(url)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     b64 = base64.b64encode(buf.getvalue()).decode()
-    return render_template("qr.html", url=url, qr_b64=b64, tunnel=bool(PUBLIC_URL["url"]))
+    return render_template("qr.html", url=url, qr_b64=b64, tunnel=(url != f"http://{get_local_ip()}:8000"))
+
+
+def coach_access_url():
+    """The URL coaches should use to reach this app: the real public hostname
+    when reached through one (e.g. PythonAnywhere), else the Cloudflare tunnel
+    if running, else the laptop's LAN IP for same-WiFi access."""
+    host = (request.host or "").split(":")[0]
+    if host not in ("127.0.0.1", "localhost", "::1") and not host.startswith("192.168.") \
+            and not host.startswith("10.") and host != get_local_ip():
+        return request.url_root.rstrip("/")
+    return PUBLIC_URL["url"] or f"http://{get_local_ip()}:8000"
 
 
 def get_local_ip():
