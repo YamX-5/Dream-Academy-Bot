@@ -589,10 +589,14 @@ def settings_page():
         db.save_settings(st)
         saved = True
     con = db.get_db()
-    groups = con.execute("SELECT * FROM groups").fetchall()
+    groups = con.execute(
+        "SELECT g.*, (SELECT COUNT(*) FROM players p WHERE p.group_id=g.id) AS player_count "
+        "FROM groups g").fetchall()
     con.close()
+    group_error = request.args.get("group_error", type=int)
     return render_template("settings.html", st=st, saved=saved, groups=groups,
-                           all_days=list(DAY_AR.keys()), public_url=PUBLIC_URL["url"])
+                           all_days=list(DAY_AR.keys()), public_url=PUBLIC_URL["url"],
+                           group_error=group_error)
 
 
 @app.route("/groups/save", methods=["POST"])
@@ -610,6 +614,20 @@ def groups_save():
                     vals + (gid,))
     else:
         con.execute("INSERT INTO groups (name_ar,name_en,min_age,max_age,gender,schedule_days,time_slot) VALUES (?,?,?,?,?,?,?)", vals)
+    con.commit()
+    con.close()
+    return redirect(url_for("settings_page"))
+
+
+@app.route("/groups/<int:gid>/delete", methods=["POST"])
+@require_role("admin")
+def groups_delete(gid):
+    con = db.get_db()
+    count = con.execute("SELECT COUNT(*) c FROM players WHERE group_id=?", (gid,)).fetchone()["c"]
+    if count > 0:
+        con.close()
+        return redirect(url_for("settings_page", group_error=gid))
+    con.execute("DELETE FROM groups WHERE id=?", (gid,))
     con.commit()
     con.close()
     return redirect(url_for("settings_page"))
