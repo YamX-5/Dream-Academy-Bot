@@ -2,20 +2,55 @@
 {% from "_icons.html" import icon %}
 {% block title %}{{ t('nav_attendance') }}{% endblock %}
 {% block content %}
-<div class="flex items-center gap-2 mb-4">
-  <select id="group" class="flex-1 bg-card border border-edge rounded-lg px-3 py-3 focus:border-accent outline-none transition">
-    <option value="">{{ t('choose_group') }}</option>
-    {% for g in groups %}
-    <option value="{{ g.id }}">{{ g.name_ar if lang == 'ar' else g.name_en }} · {{ g.time_slot }}</option>
-    {% endfor %}
-  </select>
-  <input id="sdate" type="date" value="{{ default_date }}"
-         class="bg-card border border-edge rounded-lg px-2 py-3 focus:border-accent outline-none transition" />
+
+<!-- group picker -->
+<select id="group" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mb-2 text-base focus:border-accent outline-none transition">
+  <option value="">{{ t('choose_group') }}</option>
+  {% for g in groups %}
+  <option value="{{ g.id }}">{{ g.name_ar if lang == 'ar' else g.name_en }} · {{ g.time_slot }}</option>
+  {% endfor %}
+</select>
+
+<!-- date bar: auto-today, step with arrows, tap centre to jump -->
+<div class="flex items-stretch gap-2 mb-3">
+  <button id="prevDay" aria-label="previous day" class="bg-card border border-edge rounded-lg px-3 flex items-center justify-center text-dim hover:text-accent hover:border-accent/50 transition">
+    <svg class="w-5 h-5 rtl-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+  </button>
+  <button id="dateBtn" class="flex-1 bg-card border border-edge rounded-lg px-3 py-2.5 text-center relative hover:border-accent/50 transition">
+    <div id="dateMain" class="font-semibold leading-tight">—</div>
+    <div id="dateSub" class="text-[11px] text-dim leading-tight"></div>
+    <input id="sdate" type="date" value="{{ default_date }}" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer" aria-label="pick date" />
+  </button>
+  <button id="nextDay" aria-label="next day" class="bg-card border border-edge rounded-lg px-3 flex items-center justify-center text-dim hover:text-accent hover:border-accent/50 transition">
+    <svg class="w-5 h-5 rtl-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+  </button>
+  <button id="todayBtn" class="hidden bg-accent/15 border border-accent/50 text-accent rounded-lg px-3 text-sm font-semibold transition">{{ t('today') }}</button>
 </div>
 
-<div id="counter" class="hidden mb-3 flex items-center justify-between bg-card rounded-lg px-4 py-3 border border-edge">
-  <div class="font-semibold num">{{ t('present_word') }} <span id="pcount" class="text-accent">0</span> <span class="text-dim">/ <span id="tcount">0</span></span></div>
-  <button id="closeBtn" class="bg-accent hover:bg-accent2 text-bg font-semibold px-4 py-2 rounded-lg text-sm transition">{{ t('close_session') }}</button>
+<!-- live stats + actions (shown when a group is picked) -->
+<div id="statsBar" class="hidden mb-3">
+  <div class="grid grid-cols-3 gap-2 mb-2">
+    <div class="bg-card border border-edge rounded-lg py-2 text-center">
+      <div class="text-xl font-bold num text-emerald-400" id="pcount">0</div>
+      <div class="label-xs">{{ t('present_word') }}</div>
+    </div>
+    <div class="bg-card border border-edge rounded-lg py-2 text-center">
+      <div class="text-xl font-bold num text-red-400" id="acount">0</div>
+      <div class="label-xs">{{ t('absent_word') }}</div>
+    </div>
+    <div class="bg-card border border-edge rounded-lg py-2 text-center">
+      <div class="text-xl font-bold num text-accent" id="rateval">—</div>
+      <div class="label-xs">{{ t('session_rate') }}</div>
+    </div>
+  </div>
+  <div class="flex items-center justify-between gap-2">
+    <div class="text-xs text-dim num" id="marked">0 / 0</div>
+    <div class="flex gap-2">
+      <button id="allBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-2 rounded-lg text-sm transition flex items-center gap-1.5">
+        {{ icon('check','w-4 h-4') }}{{ t('mark_all_present') }}</button>
+      <button id="closeBtn" class="bg-accent hover:bg-accent2 text-bg font-semibold px-3 py-2 rounded-lg text-sm transition">{{ t('close_session') }}</button>
+    </div>
+  </div>
 </div>
 
 <div class="text-xs text-dim mb-3" id="hint" style="display:none">{{ t('hint') }}</div>
@@ -60,8 +95,18 @@
 </div>
 {% endblock %}
 
+{% block head %}
+<style>
+  [dir="rtl"] .rtl-flip { transform: scaleX(-1); }
+</style>
+{% endblock %}
+
 {% block scripts %}
 <script>
+const LANG = {{ lang|tojson }};
+const LOCALE = LANG === 'ar' ? 'ar' : 'en-GB';
+const TODAY = {{ today|tojson }};
+const TRAINING_DAYS = {{ training_days|tojson }};
 const I18N = {
   left:   {{ t('left_badge')|tojson }},
   noSub:  {{ t('no_sub_badge')|tojson }},
@@ -71,37 +116,63 @@ const I18N = {
   addPlayer: {{ t('add_player')|tojson }},
   addFailed: {{ t('add_failed')|tojson }},
   add: {{ t('add')|tojson }},
-  adding: {{ t('adding')|tojson }}
+  adding: {{ t('adding')|tojson }},
+  today: {{ t('today')|tojson }},
+  yesterday: {{ t('yesterday')|tojson }},
+  tomorrow: {{ t('tomorrow')|tojson }},
+  notTraining: {{ t('not_training_day')|tojson }},
+  markedOf: {{ t('marked_of')|tojson }}
 };
 const SVG = {
-  present: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
-  absent:  '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-  excused: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>',
+  present: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  absent:  '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  excused: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>',
   none: ''
 };
 const grid = document.getElementById('grid');
 const groupSel = document.getElementById('group');
 const dateInp = document.getElementById('sdate');
 let players = [];
+let curDate = TODAY;
 
+// high-contrast card states (readable on a court in daylight)
 const STYLES = {
-  present: 'bg-accent/15 border-accent text-white',
-  absent:  'bg-white/[0.02] border-edge text-dim',
-  excused: 'bg-yellow-500/10 border-yellow-500/50 text-yellow-200',
+  present: 'bg-emerald-500 border-emerald-500 text-white',
+  absent:  'bg-red-500/90 border-red-500 text-white',
+  excused: 'bg-amber-400 border-amber-400 text-black',
   none:    'bg-card border-edge text-white'
 };
-const CHIP = {
-  present: 'bg-accent text-bg',
-  absent:  'bg-white/10 text-dim',
-  excused: 'bg-yellow-500/80 text-bg',
-  none: ''
-};
 const NEXT = { none:'present', present:'absent', absent:'none', excused:'none' };
+
+function isoShift(iso, delta) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+function refreshDateUI() {
+  const d = new Date(curDate + 'T12:00:00');
+  const wd = d.toLocaleDateString(LOCALE, {weekday: 'long'});
+  const dm = d.toLocaleDateString(LOCALE, {day: 'numeric', month: 'short'});
+  let prefix = '';
+  if (curDate === TODAY) prefix = I18N.today;
+  else if (curDate === isoShift(TODAY, -1)) prefix = I18N.yesterday;
+  else if (curDate === isoShift(TODAY, 1)) prefix = I18N.tomorrow;
+  document.getElementById('dateMain').textContent = prefix ? `${prefix} · ${dm}` : `${wd} ${dm}`;
+  // English weekday name for training-day check
+  const wdEn = d.toLocaleDateString('en-US', {weekday: 'long'});
+  const isTraining = TRAINING_DAYS.includes(wdEn);
+  document.getElementById('dateSub').textContent = isTraining ? wd : `${wd} · ${I18N.notTraining}`;
+  document.getElementById('dateSub').className =
+    'text-[11px] leading-tight ' + (isTraining ? 'text-dim' : 'text-amber-400');
+  document.getElementById('todayBtn').classList.toggle('hidden', curDate === TODAY);
+  dateInp.value = curDate;
+}
 
 async function load() {
   const gid = groupSel.value;
   if (!gid) { grid.innerHTML=''; toggleUi(false); return; }
-  const r = await fetch(`/api/attendance?group=${gid}&date=${dateInp.value}`);
+  const r = await fetch(`/api/attendance?group=${gid}&date=${curDate}`);
   if (r.status === 401) { location = '/login'; return; }
   const data = await r.json();
   players = data.players;
@@ -111,25 +182,25 @@ async function load() {
 
 function toggleUi(on) {
   document.getElementById('empty').style.display = on ? 'none' : '';
-  document.getElementById('counter').classList.toggle('hidden', !on);
+  document.getElementById('statsBar').classList.toggle('hidden', !on);
   document.getElementById('hint').style.display = on ? '' : 'none';
 }
 
 function render() {
   grid.innerHTML = '';
+  const rtl = document.documentElement.dir === 'rtl';
   players.forEach(p => {
     const card = document.createElement('button');
-    card.className = `relative rounded-lg border px-2 py-4 text-center font-semibold leading-tight
-      transition select-none ${STYLES[p.status]} ${!p.paid ? 'border-red-500/70' : ''}`;
+    card.className = `relative rounded-lg border-2 px-2 py-4 text-center font-semibold leading-tight
+      transition select-none min-h-[80px] ${STYLES[p.status]} ${!p.paid ? 'ring-2 ring-red-500/80' : ''}`;
     card.innerHTML = `
       <div class="text-[15px]">${p.name}</div>
-      <div class="mt-1 text-xs font-normal num ${p.left <= 2 ? 'text-red-400 font-semibold' : 'text-dim'}">
-        ${p.paid ? I18N.left.replace('{n}', p.left) : `<span class="text-red-400">${I18N.noSub}</span>`}
+      <div class="mt-1 text-xs font-normal num ${p.status==='none' && p.left <= 2 ? 'text-red-400 font-semibold' : 'opacity-80'}">
+        ${p.paid ? I18N.left.replace('{n}', p.left) : `<span class="${p.status==='none'?'text-red-400':''}">${I18N.noSub}</span>`}
       </div>
-      ${p.frozen ? `<div class="text-[10px] uppercase tracking-wide text-sky-300 mt-0.5">${I18N.frozen}</div>` : ''}
-      ${p.pending ? `<span class="absolute top-1.5 ${document.documentElement.dir==='rtl'?'right-1.5':'left-1.5'} text-[9px] uppercase tracking-wide bg-amber-500/25 text-amber-200 rounded px-1 py-0.5">${I18N.newBadge}</span>` : ''}
-      ${p.status !== 'none' ? `<span class="absolute top-1.5 ${document.documentElement.dir==='rtl'?'left-1.5':'right-1.5'} w-6 h-6 rounded-md grid place-items-center ${CHIP[p.status]}">${SVG[p.status]}</span>` : ''}`;
-    // tap cycles, long-press = excused
+      ${p.frozen ? `<div class="text-[10px] uppercase tracking-wide mt-0.5 opacity-80">${I18N.frozen}</div>` : ''}
+      ${p.pending ? `<span class="absolute top-1.5 ${rtl?'right-1.5':'left-1.5'} text-[9px] uppercase tracking-wide bg-amber-500/30 text-amber-100 rounded px-1 py-0.5">${I18N.newBadge}</span>` : ''}
+      ${p.status !== 'none' ? `<span class="absolute top-1.5 ${rtl?'left-1.5':'right-1.5'}">${SVG[p.status]}</span>` : ''}`;
     let timer = null, longFired = false;
     const start = () => { longFired = false; timer = setTimeout(() => { longFired = true; mark(p, 'excused'); }, 550); };
     const end = (e) => { clearTimeout(timer); if (!longFired) mark(p, NEXT[p.status]); e.preventDefault(); };
@@ -141,20 +212,19 @@ function render() {
     card.addEventListener('contextmenu', e => e.preventDefault());
     grid.appendChild(card);
   });
-  // quick "add player" tile
   const add = document.createElement('button');
   add.type = 'button';
-  add.className = 'rounded-lg border border-dashed border-accent/50 text-accent px-2 py-4 flex flex-col items-center justify-center gap-1 hover:bg-accent/10 transition min-h-[76px]';
+  add.className = 'rounded-lg border-2 border-dashed border-accent/50 text-accent px-2 py-4 flex flex-col items-center justify-center gap-1 hover:bg-accent/10 transition min-h-[80px]';
   add.innerHTML = `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span class="text-xs font-semibold">${I18N.addPlayer}</span>`;
   add.addEventListener('click', openAdd);
   grid.appendChild(add);
-  updateCounter();
+  updateStats();
 }
 
 async function mark(p, status) {
   const r = await fetch('/api/attendance/mark', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({player_id: p.id, date: dateInp.value, group_id: groupSel.value, status})
+    body: JSON.stringify({player_id: p.id, date: curDate, group_id: groupSel.value, status})
   });
   if (!r.ok) { alert(I18N.saveError); return; }
   const d = await r.json();
@@ -162,9 +232,39 @@ async function mark(p, status) {
   render();
 }
 
-function updateCounter() {
-  document.getElementById('pcount').textContent = players.filter(p=>p.status==='present').length;
-  document.getElementById('tcount').textContent = players.length;
+function updateStats() {
+  const present = players.filter(p=>p.status==='present').length;
+  const absent  = players.filter(p=>p.status==='absent').length;
+  const marked  = players.filter(p=>p.status!=='none').length;
+  const counted = present + absent;
+  document.getElementById('pcount').textContent = present;
+  document.getElementById('acount').textContent = absent;
+  document.getElementById('rateval').textContent = counted ? Math.round(present*100/counted) + '%' : '—';
+  document.getElementById('marked').textContent = I18N.markedOf.replace('{n}', marked).replace('{t}', players.length);
+}
+
+document.getElementById('allBtn').addEventListener('click', async () => {
+  const r = await fetch('/api/attendance/mark-all-present', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({group_id: groupSel.value, date: curDate})
+  });
+  if (r.ok) load();
+});
+
+document.getElementById('closeBtn').addEventListener('click', async () => {
+  const r = await fetch(`/api/attendance/summary?group=${groupSel.value}&date=${curDate}`);
+  const d = await r.json();
+  document.getElementById('summaryText').textContent = d.text;
+  document.getElementById('copied').classList.add('hidden');
+  document.getElementById('modal').classList.remove('hidden');
+});
+
+function copySummary() {
+  const text = document.getElementById('summaryText').textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+    .catch(() => { const ta = document.createElement('textarea'); ta.value = text;
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); })
+    .finally(() => document.getElementById('copied').classList.remove('hidden'));
 }
 
 function openAdd() {
@@ -195,23 +295,13 @@ async function submitAdd() {
   render();
 }
 
-document.getElementById('closeBtn').addEventListener('click', async () => {
-  const r = await fetch(`/api/attendance/summary?group=${groupSel.value}&date=${dateInp.value}`);
-  const d = await r.json();
-  document.getElementById('summaryText').textContent = d.text;
-  document.getElementById('copied').classList.add('hidden');
-  document.getElementById('modal').classList.remove('hidden');
-});
-
-function copySummary() {
-  const text = document.getElementById('summaryText').textContent;
-  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
-    .catch(() => { const ta = document.createElement('textarea'); ta.value = text;
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); })
-    .finally(() => document.getElementById('copied').classList.remove('hidden'));
-}
-
+// date navigation
+document.getElementById('prevDay').addEventListener('click', () => { curDate = isoShift(curDate, -1); refreshDateUI(); load(); });
+document.getElementById('nextDay').addEventListener('click', () => { curDate = isoShift(curDate, 1); refreshDateUI(); load(); });
+document.getElementById('todayBtn').addEventListener('click', () => { curDate = TODAY; refreshDateUI(); load(); });
+dateInp.addEventListener('change', () => { if (dateInp.value) { curDate = dateInp.value; refreshDateUI(); load(); } });
 groupSel.addEventListener('change', load);
-dateInp.addEventListener('change', load);
+
+refreshDateUI();
 </script>
 {% endblock %}

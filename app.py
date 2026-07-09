@@ -220,6 +220,7 @@ def dashboard():
         "revenue_month": con.execute(
             "SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?", (month + "%",)).fetchone()["s"],
         "unpaid_count": con.execute("SELECT COUNT(*) c FROM attendance WHERE unpaid=1").fetchone()["c"],
+        "attendance_rate": db.month_attendance_rate(con, month),
     }
 
     # renewal alerts
@@ -381,6 +382,7 @@ def player_card(pid):
     pays = con.execute("SELECT * FROM payments WHERE player_id=? ORDER BY date DESC, id DESC", (pid,)).fetchall()
     att = con.execute(
         "SELECT * FROM attendance WHERE player_id=? ORDER BY session_date DESC LIMIT 30", (pid,)).fetchall()
+    att_stats = db.attendance_rate(con, pid)
     msg = render_template_msg(st["template_renewal"], p["full_name"], info["left"], st["monthly_price"])
     wa = wa_link(p["guardian_phone"] or p["phone"], msg)
     # early-renewal option: day after previous expiry
@@ -389,7 +391,8 @@ def player_card(pid):
         prev_expiry = (date.fromisoformat(info["sub"]["expiry_date"]) + timedelta(days=1)).isoformat()
     con.close()
     return render_template("player_card.html", p=p, info=info, subs=subs, pays=pays, att=att,
-                           wa=wa, settings=st, prev_expiry=prev_expiry, today=date.today().isoformat())
+                           att_stats=att_stats, wa=wa, settings=st, prev_expiry=prev_expiry,
+                           today=date.today().isoformat())
 
 
 @app.route("/api/players/<int:pid>/renew", methods=["POST"])
@@ -462,8 +465,11 @@ def attendance_page():
     st = db.get_settings()
     groups = con.execute("SELECT * FROM groups").fetchall()
     con.close()
-    default_date = next_training_day(st).isoformat()
-    return render_template("attendance.html", groups=groups, default_date=default_date)
+    # always default to today (Jordan time); coach can step days with the arrows
+    default_date = date.today().isoformat()
+    training_days = st.get("training_days") or []
+    return render_template("attendance.html", groups=groups, default_date=default_date,
+                           today=default_date, training_days=training_days)
 
 
 @app.route("/api/attendance")
@@ -531,6 +537,27 @@ def api_attendance_mark():
     con.close()
     return jsonify({"ok": True, "status": result["status"], "unpaid": result["unpaid"],
                     "left": info["left"], "paid": info["active"]})
+
+
+@app.route("/api/attendance/mark-all-present", methods=["POST"])
+@require_role("admin", "coach")
+def api_attendance_mark_all():
+    """One-tap: mark every not-yet-present player in the group present."""
+    data = request.get_json(force=True)
+    gid = int(data["group_id"])
+    sdate = data["date"]
+    con = db.get_db()
+    players = con.execute(
+        "SELECT id FROM players WHERE group_id=? AND status IN ('active','frozen','pending')",
+        (gid,)).fetchall()
+    existing = {r["player_id"]: r["status"] for r in con.execute(
+        "SELECT player_id, status FROM attendance WHERE session_date=? AND group_id=?",
+        (sdate, gid)).fetchall()}
+    for p in players:
+        if existing.get(p["id"]) != "present":
+            db.mark_attendance(con, p["id"], sdate, gid, "present", marked_by=current_role() or "")
+    con.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/attendance/summary")

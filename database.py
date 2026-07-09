@@ -311,6 +311,40 @@ def suggest_group(con, birth_date, gender):
     return best["id"] if best else None
 
 
+def attendance_rate(con, player_id):
+    """Present / (present + absent) over a player's whole history. Excused is ignored.
+    Returns {rate, present, absent, excused, total, streak}."""
+    rows = con.execute(
+        "SELECT status, session_date FROM attendance WHERE player_id=? ORDER BY session_date DESC",
+        (player_id,)).fetchall()
+    present = sum(1 for r in rows if r["status"] == "present")
+    absent = sum(1 for r in rows if r["status"] == "absent")
+    excused = sum(1 for r in rows if r["status"] == "excused")
+    counted = present + absent
+    rate = round(present * 100 / counted) if counted else None
+    # current streak: consecutive most-recent presents (excused doesn't break it)
+    streak = 0
+    for r in rows:
+        if r["status"] == "present":
+            streak += 1
+        elif r["status"] == "excused":
+            continue
+        else:
+            break
+    return {"rate": rate, "present": present, "absent": absent, "excused": excused,
+            "total": present + absent + excused, "streak": streak}
+
+
+def month_attendance_rate(con, month=None):
+    """Overall present/(present+absent) for a YYYY-MM month (default current)."""
+    month = month or date.today().strftime("%Y-%m")
+    row = con.execute(
+        "SELECT SUM(status='present') p, SUM(status='absent') a FROM attendance "
+        "WHERE session_date LIKE ?", (month + "%",)).fetchone()
+    p, a = (row["p"] or 0), (row["a"] or 0)
+    return round(p * 100 / (p + a)) if (p + a) else None
+
+
 def add_pending_player(con, full_name, group_id, guardian_phone="", gender="M",
                        birth_date="", added_by="coach"):
     """Quick add from the court: minimal fields, status=pending for admin review."""

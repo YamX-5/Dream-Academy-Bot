@@ -99,7 +99,14 @@
 </h2>
 <div class="space-y-3 mb-6">
   <div class="bg-card rounded-lg p-4 border border-edge">
-    <div class="label-xs mb-2">{{ t('chart_att') }}</div>
+    <div class="flex items-center justify-between mb-2">
+      <div class="label-xs">{{ t('chart_att') }}</div>
+      {% if kpis.attendance_rate is not none %}
+      <div class="text-sm font-semibold num {{ 'text-emerald-400' if kpis.attendance_rate >= 75 else ('text-amber-400' if kpis.attendance_rate >= 50 else 'text-red-400') }}">
+        {{ kpis.attendance_rate }}% <span class="text-dim font-normal text-xs">{{ t('kpi_att_rate') }}</span>
+      </div>
+      {% endif %}
+    </div>
     <canvas id="attChart" height="130"></canvas>
   </div>
   <div class="bg-card rounded-lg p-4 border border-edge">
