@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}QR — Dream Academy{% endblock %}
+{% block content %}
+<div class="text-center py-6">
+  <h1 class="text-xl font-bold text-white mb-2">{{ t('coach_access') }}</h1>
+  {% if tunnel %}
+  <p class="text-dim mb-6 text-sm">{{ t('tunnel_note')|safe }}</p>
+  {% else %}
+  <p class="text-yellow-300 mb-6 text-sm">{{ t('no_tunnel_note') }}</p>
+  {% endif %}
+  <div class="inline-block bg-white p-4 rounded-xl mb-4">
+    <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR code for coach access" class="w-64 h-64" width="256" height="256" />
+  </div>
+  <div class="text-accent font-mono text-sm break-all mb-6" dir="ltr">{{ url }}</div>
+  <div class="bg-card rounded-lg p-4 border border-edge text-sm text-ink max-w-md mx-auto"
+       style="text-align:{{ 'right' if lang == 'ar' else 'left' }}">
+    <div class="label-xs mb-2">{{ t('for_coach') }}</div>
+    <ol class="list-decimal {{ 'pr-5' if lang == 'ar' else 'pl-5' }} space-y-1.5">
+      <li>{{ t('qr_step1') }}</li>
+      <li>{{ t('qr_step2') }}</li>
+      <li>{{ t('qr_step3') }}</li>
+    </ol>
+  </div>
+  {% if tunnel %}
+  <p class="text-xs text-dim mt-4 max-w-md mx-auto">{{ t('link_changes') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

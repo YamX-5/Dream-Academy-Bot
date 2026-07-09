@@ -1,0 +1,17 @@
+# runtime data — never commit the live database or backups
+academy.db
+backups/
+exports/
+
+# local environment
+venv/
+__pycache__/
+*.pyc
+
+# downloaded binary
+cloudflared.exe
+
+# editor / os
+.claude/
+Thumbs.db
+config.yml

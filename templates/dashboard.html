@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ t('dash_title') }}{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold text-white mb-4">{{ t('dash_title') }}</h1>
+
+<div class="grid grid-cols-2 gap-2 mb-6">
+  <div class="bg-card rounded-lg p-4 border border-edge">
+    <div class="label-xs mb-1">{{ t('kpi_active') }}</div>
+    <div class="text-2xl font-bold num text-white">{{ kpis.active_players }}</div>
+  </div>
+  <div class="bg-card rounded-lg p-4 border border-edge">
+    <div class="label-xs mb-1">{{ t('kpi_present') }}</div>
+    <div class="text-2xl font-bold num text-white">{{ kpis.present_today }}</div>
+  </div>
+  <div class="bg-card rounded-lg p-4 border border-edge">
+    <div class="label-xs mb-1">{{ t('kpi_revenue') }}</div>
+    <div class="text-2xl font-bold num text-emerald-400">{{ kpis.revenue_month }} <span class="text-sm font-medium">JD</span></div>
+  </div>
+  <div class="bg-card rounded-lg p-4 border {{ 'border-red-500/50' if kpis.unpaid_count else 'border-edge' }}">
+    <div class="label-xs mb-1">{{ t('kpi_unpaid') }}</div>
+    <div class="text-2xl font-bold num {{ 'text-red-400' if kpis.unpaid_count else 'text-white' }}">{{ kpis.unpaid_count }}</div>
+  </div>
+</div>
+
+{% if alerts %}
+<h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
+  <span class="text-yellow-400">{{ icon('clock','w-4 h-4') }}</span>{{ t('renewal_alerts') }}
+</h2>
+<div class="space-y-2 mb-6">
+  {% for a in alerts %}
+  <div class="bg-card rounded-lg px-4 py-3 border border-edge flex items-center justify-between gap-2">
+    <a href="/players/{{ a.player.id }}" class="min-w-0">
+      <div class="font-semibold truncate">{{ a.player.full_name }}</div>
+      <div class="text-xs text-dim num">
+        {% if a.active %}{{ t('alert_left_days', n=a.left, d=a.days_left) }}{% else %}<span class="text-red-400">{{ t('expired_needs_renewal') }}</span>{% endif %}
+        · {{ a.player.group_name or '—' }}
+      </div>
+    </a>
+    {% if a.player.guardian_phone or a.player.phone %}
+    <a href="{{ a.wa }}" target="_blank"
+       class="shrink-0 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
+      {{ icon('message','w-3.5 h-3.5') }}{{ t('whatsapp') }}</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if unpaid %}
+<h2 class="flex items-center gap-2 font-semibold mb-2 text-red-400">
+  {{ icon('alert','w-4 h-4') }}{{ t('unpaid_title') }}
+</h2>
+<div class="space-y-2 mb-6">
+  {% for u in unpaid %}
+  <a href="/players/{{ u.pid }}" class="block bg-card rounded-lg px-4 py-3 border border-red-500/40 hover:border-red-500/70 transition">
+    <div class="font-semibold">{{ u.full_name }}</div>
+    <div class="text-xs text-dim num">{{ t('attended_unpaid', d=u.session_date) }} · {{ u.group_name or '—' }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
+  <span class="text-accent">{{ icon('chart','w-4 h-4') }}</span>{{ t('charts') }}
+</h2>
+<div class="space-y-3 mb-6">
+  <div class="bg-card rounded-lg p-4 border border-edge">
+    <div class="label-xs mb-2">{{ t('chart_att') }}</div>
+    <canvas id="attChart" height="130"></canvas>
+  </div>
+  <div class="bg-card rounded-lg p-4 border border-edge">
+    <div class="label-xs mb-2">{{ t('chart_rev') }}</div>
+    <canvas id="revChart" height="130"></canvas>
+  </div>
+  <div class="bg-card rounded-lg p-4 border border-edge">
+    <div class="label-xs mb-2">{{ t('chart_grp') }}</div>
+    <canvas id="grpChart" height="130"></canvas>
+  </div>
+</div>
+
+{% if bdays %}
+<h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
+  <span class="text-accent">{{ icon('gift','w-4 h-4') }}</span>{{ t('birthdays') }}
+</h2>
+<div class="bg-card rounded-lg px-4 py-2 border border-edge mb-6 divide-y divide-white/5">
+  {% for b in bdays %}
+  <div class="flex justify-between items-center py-2">
+    <a href="/players/{{ b.id }}" class="font-medium hover:text-accent transition">{{ b.full_name }}</a>
+    <span class="text-dim text-sm num">{{ b.birth_date[8:10] }}/{{ b.birth_date[5:7] }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="flex flex-wrap gap-2">
+  <a href="/export/all" class="flex items-center gap-2 bg-accent hover:bg-accent2 text-bg font-semibold px-4 py-2.5 rounded-lg text-sm transition">
+    {{ icon('download','w-4 h-4') }}{{ t('export_all') }}</a>
+  <a href="/settings" class="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-edge px-4 py-2.5 rounded-lg text-sm transition">
+    {{ icon('settings','w-4 h-4') }}{{ t('settings') }}</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+const opts = { plugins:{legend:{display:false}}, scales:{
+  x:{ticks:{color:'#8593A6',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+  y:{ticks:{color:'#8593A6',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}}};
+function mk(id,type,data,color){ new Chart(document.getElementById(id),{type,
+  data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:color,borderColor:color,tension:.3,borderRadius:3}]},options:opts});}
+mk('attChart','line',{{ att_chart|tojson }},'#5B9BD5');
+mk('revChart','bar',{{ rev_chart|tojson }},'#34d399');
+mk('grpChart','bar',{{ grp_chart|tojson }},'#5B9BD5');
+</script>
+{% endblock %}

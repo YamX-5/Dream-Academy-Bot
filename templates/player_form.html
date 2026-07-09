@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ t('edit_player') if player else t('new_player_title') }}{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold text-white mb-4">
+  {{ t('edit_player') if player else t('new_player_title') }}
+</h1>
+{% if error %}<div class="bg-red-500/15 border border-red-500/50 text-red-300 rounded-lg px-4 py-3 mb-4" role="alert">{{ error }}</div>{% endif %}
+<form method="post" class="space-y-3">
+  <div>
+    <label class="label-xs" for="full_name">{{ t('full_name') }}</label>
+    <input id="full_name" name="full_name" required value="{{ player.full_name if player else '' }}"
+           class="w-full bg-card border border-edge rounded-lg px-4 py-3 mt-1 focus:border-accent outline-none transition" />
+  </div>
+  <div class="grid grid-cols-2 gap-2">
+    <div>
+      <label class="label-xs" for="birth_date">{{ t('birth_date') }}</label>
+      <input name="birth_date" id="birth_date" type="date" value="{{ player.birth_date if player else '' }}"
+             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none" />
+    </div>
+    <div>
+      <label class="label-xs" for="gender">{{ t('gender') }}</label>
+      <select name="gender" id="gender" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">
+        <option value="M" {% if player and player.gender=='M' %}selected{% endif %}>{{ t('male') }}</option>
+        <option value="F" {% if player and player.gender=='F' %}selected{% endif %}>{{ t('female') }}</option>
+      </select>
+    </div>
+  </div>
+  <div>
+    <label class="label-xs" for="group_id">{{ t('group') }} <span id="suggestNote" class="text-accent text-xs normal-case tracking-normal"></span></label>
+    <select name="group_id" id="group_id" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">
+      <option value="">—</option>
+      {% for g in groups %}
+      <option value="{{ g.id }}" {% if player and player.group_id==g.id %}selected{% endif %}>{{ g.name_ar if lang == 'ar' else g.name_en }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="grid grid-cols-2 gap-2">
+    <div>
+      <label class="label-xs" for="phone">{{ t('phone') }}</label>
+      <input id="phone" name="phone" value="{{ player.phone if player else '' }}" inputmode="tel"
+             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none" placeholder="07XXXXXXXX" />
+    </div>
+    <div>
+      <label class="label-xs" for="join_date">{{ t('joined') }}</label>
+      <input id="join_date" name="join_date" type="date" value="{{ player.join_date if player else today }}"
+             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none" />
+    </div>
+  </div>
+  <div class="grid grid-cols-2 gap-2">
+    <div>
+      <label class="label-xs" for="guardian_name">{{ t('guardian') }}</label>
+      <input id="guardian_name" name="guardian_name" value="{{ player.guardian_name if player else '' }}"
+             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none" />
+    </div>
+    <div>
+      <label class="label-xs" for="guardian_phone">{{ t('guardian_wa') }}</label>
+      <input id="guardian_phone" name="guardian_phone" value="{{ player.guardian_phone if player else '' }}" inputmode="tel"
+             pattern="07[0-9]{8}" placeholder="07XXXXXXXX"
+             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none" />
+    </div>
+  </div>
+  <div>
+    <label class="label-xs" for="notes">{{ t('notes') }}</label>
+    <textarea id="notes" name="notes" rows="2" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">{{ player.notes if player else '' }}</textarea>
+  </div>
+  <div class="grid grid-cols-2 gap-2">
+    <div>
+      <label class="label-xs" for="status">{{ t('status') }}</label>
+      <select id="status" name="status" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">
+        <option value="active" {% if not player or player.status=='active' %}selected{% endif %}>{{ t('st_active') }}</option>
+        <option value="frozen" {% if player and player.status=='frozen' %}selected{% endif %}>{{ t('st_frozen') }}</option>
+        <option value="left" {% if player and player.status=='left' %}selected{% endif %}>{{ t('st_left') }}</option>
+      </select>
+    </div>
+    <label class="flex items-center gap-2 mt-6 text-sm">
+      <input type="checkbox" name="trial_used" {% if player and player.trial_used %}checked{% endif %} class="accent-[#5B9BD5]"> {{ t('trial_used') }}
+    </label>
+  </div>
+  <button class="w-full bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('save') }}</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const bd = document.getElementById('birth_date'), gen = document.getElementById('gender'),
+      grp = document.getElementById('group_id'), note = document.getElementById('suggestNote');
+const isNew = {{ 'false' if player else 'true' }};
+const SUGGEST_NOTE = {{ t('suggest_note')|tojson }};
+async function suggest() {
+  if (!isNew || !bd.value) return;
+  const r = await fetch(`/api/suggest-group?birth_date=${bd.value}&gender=${gen.value}`);
+  const d = await r.json();
+  if (d.group_id) {
+    grp.value = d.group_id;
+    note.textContent = SUGGEST_NOTE;
+  }
+}
+bd.addEventListener('change', suggest);
+gen.addEventListener('change', suggest);
+</script>
+{% endblock %}

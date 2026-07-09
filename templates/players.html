@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ t('players_title') }}{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-bold text-white">{{ t('players_title') }}</h1>
+  <a href="/players/new" class="flex items-center gap-1.5 bg-accent hover:bg-accent2 text-bg font-semibold px-3.5 py-2 rounded-lg text-sm transition">
+    {{ icon('plus','w-4 h-4') }}{{ t('new_player') }}</a>
+</div>
+
+<form method="get" class="space-y-2 mb-4">
+  <div class="relative">
+    <span class="absolute {{ 'right-3' if dir == 'rtl' else 'left-3' }} top-1/2 -translate-y-1/2 text-dim">{{ icon('search','w-4 h-4') }}</span>
+    <input name="q" value="{{ q }}" placeholder="{{ t('search_ph') }}"
+           class="w-full bg-card border border-edge rounded-lg {{ 'pr-10 pl-4' if dir == 'rtl' else 'pl-10 pr-4' }} py-3 focus:border-accent outline-none transition" />
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+    <select name="group" class="bg-card border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
+      <option value="">{{ t('all_groups') }}</option>
+      {% for g in groups %}<option value="{{ g.id }}" {% if f_group|string == g.id|string %}selected{% endif %}>{{ g.name_ar if lang == 'ar' else g.name_en }}</option>{% endfor %}
+    </select>
+    <select name="gender" class="bg-card border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
+      <option value="">{{ t('all') }}</option>
+      <option value="M" {% if f_gender=='M' %}selected{% endif %}>{{ t('males') }}</option>
+      <option value="F" {% if f_gender=='F' %}selected{% endif %}>{{ t('females') }}</option>
+    </select>
+    <select name="status" class="bg-card border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
+      <option value="">{{ t('all_statuses') }}</option>
+      <option value="active" {% if f_status=='active' %}selected{% endif %}>{{ t('st_active') }}</option>
+      <option value="frozen" {% if f_status=='frozen' %}selected{% endif %}>{{ t('st_frozen') }}</option>
+      <option value="left" {% if f_status=='left' %}selected{% endif %}>{{ t('st_left') }}</option>
+    </select>
+    <label class="flex items-center gap-2 bg-card border border-edge rounded-lg px-3 py-2">
+      <input type="checkbox" name="renewal" value="1" {% if f_renewal %}checked{% endif %} class="accent-[#5B9BD5]"> {{ t('needs_renewal') }}
+    </label>
+  </div>
+  <button class="bg-white/5 hover:bg-white/10 border border-edge px-4 py-2 rounded-lg text-sm transition">{{ t('apply_filter') }}</button>
+</form>
+
+<div class="space-y-2">
+  {% for item in players %}
+  {% set p = item.p %}{% set info = item.info %}
+  <a href="/players/{{ p.id }}" class="block bg-card rounded-lg px-4 py-3 border transition hover:border-accent/40
+     {{ 'border-red-500/40' if info.needs_renewal else 'border-edge' }}">
+    <div class="flex items-center justify-between">
+      <div class="font-semibold">{{ p.full_name }}
+        {% if p.status=='frozen' %}<span class="text-[10px] uppercase tracking-wide text-sky-300 border border-sky-500/40 rounded px-1.5 py-0.5 {{ 'mr-1' if dir == 'rtl' else 'ml-1' }}">{{ t('st_frozen') }}</span>{% endif %}
+        {% if p.status=='left' %}<span class="text-[10px] uppercase tracking-wide text-dim border border-edge rounded px-1.5 py-0.5 {{ 'mr-1' if dir == 'rtl' else 'ml-1' }}">{{ t('st_left') }}</span>{% endif %}
+      </div>
+      <div class="text-xs text-dim">{{ p.group_name or '—' }}</div>
+    </div>
+    <div class="text-sm mt-1 num {{ 'text-red-400' if not info.active else 'text-dim' }}">
+      {% if info.active %}
+        {{ t('left_expires', n=info.left, d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7]) }}
+      {% else %}{{ t('no_active_sub') }}{% endif %}
+    </div>
+  </a>
+  {% else %}
+  <div class="text-center text-dim py-10">{{ t('no_results') }}</div>
+  {% endfor %}
+</div>
+
+<div class="mt-6 bg-card rounded-lg p-4 border border-edge">
+  <div class="flex items-center gap-2 font-semibold mb-2">{{ icon('upload','w-4 h-4') }}{{ t('import_title') }}</div>
+  <div class="text-xs text-dim mb-3">{{ t('import_hint_pre') }} <a href="/import/template" class="text-accent underline">{{ t('import_hint_link') }}</a>{{ t('import_hint_post') }}</div>
+  <form method="post" action="/import/players" enctype="multipart/form-data" class="flex gap-2">
+    <input type="file" name="file" accept=".xlsx" required class="text-sm flex-1 text-dim" />
+    <button class="bg-accent hover:bg-accent2 text-bg font-semibold px-4 py-2 rounded-lg text-sm transition">{{ t('import_btn') }}</button>
+  </form>
+</div>
+{% endblock %}

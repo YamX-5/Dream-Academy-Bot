@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ t('login_btn') }} — Dream Academy{% endblock %}
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh] text-center">
+  <span class="w-14 h-14 rounded-xl bg-accent/15 border border-accent/40 text-accent grid place-items-center font-extrabold text-xl mb-3">DA</span>
+  <div class="text-white font-bold mb-1">Dream Academy</div>
+  <div class="text-dim text-xs mb-8">{{ t('console_sub') }}</div>
+  <form method="post" class="bg-card rounded-xl p-6 w-full max-w-xs border border-edge">
+    <label for="pin" class="label-xs block mb-3 text-start">{{ t('enter_pin') }}</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autofocus
+           class="w-full text-center text-2xl tracking-[0.4em] bg-bg border border-edge rounded-lg py-3 mb-4 focus:border-accent outline-none transition" />
+    {% if error %}<div class="text-red-400 text-sm mb-3" role="alert">{{ error }}</div>{% endif %}
+    <button class="w-full bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('login_btn') }}</button>
+  </form>
+</div>
+{% endblock %}

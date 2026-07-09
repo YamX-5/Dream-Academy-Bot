@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ t('receipt_no') }} {{ pm.receipt_no }}</title>
+<style>
+  @page { size: A6; margin: 8mm; }
+  body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif; background:#fff; color:#111;
+         font-variant-numeric: tabular-nums;
+         max-width: 105mm; margin: 0 auto; padding: 16px; }
+  .head { text-align:center; border-bottom: 2px solid #5B9BD5; padding-bottom: 8px; margin-bottom: 12px; }
+  .logo { font-size: 28px; font-weight: 900; }
+  .logo span { color:#5B9BD5; }
+  table { width:100%; font-size: 14px; border-collapse: collapse; }
+  td { padding: 5px 0; }
+  td:last-child { text-align:{{ 'left' if dir == 'rtl' else 'right' }}; font-weight:bold; }
+  .amount { font-size: 22px; color:#2e7d32; }
+  .foot { text-align:center; color:#777; font-size:11px; margin-top:14px; }
+  .noprint { text-align:center; margin-top:16px; }
+  @media print { .noprint { display:none; } }
+</style>
+</head>
+<body>
+<div class="head">
+  <div class="logo">DA <span>— Dream Academy</span></div>
+  <div style="font-size:12px;color:#666">{{ t('academy_sub') }}</div>
+</div>
+<table>
+  <tr><td>{{ t('receipt_no') }}</td><td dir="ltr">{{ pm.receipt_no }}</td></tr>
+  <tr><td>{{ t('date') }}</td><td dir="ltr">{{ pm.date }}</td></tr>
+  <tr><td>{{ t('name') }}</td><td>{{ pm.full_name }}</td></tr>
+  <tr><td>{{ t('amount') }}</td><td class="amount">{{ pm.amount }} JD</td></tr>
+  <tr><td>{{ t('method') }}</td><td>{{ t(pm.method) if pm.method in ['cash','cliq','other'] else pm.method }}</td></tr>
+  {% if sub %}
+  <tr><td>{{ t('subscription') }}</td><td dir="ltr">{{ sub.start_date }} → {{ sub.expiry_date }}</td></tr>
+  <tr><td>{{ t('sessions_count') }}</td><td>{{ sub.sessions_total }}</td></tr>
+  {% endif %}
+  {% if pm.note %}<tr><td>{{ t('note') }}</td><td>{{ pm.note }}</td></tr>{% endif %}
+</table>
+<div class="foot">{{ t('thanks') }}</div>
+<div class="noprint">
+  <button onclick="window.print()" style="padding:10px 24px;font-size:16px;border-radius:8px;border:0;background:#5B9BD5;color:#fff;font-weight:bold">{{ t('print') }}</button>
+  <a href="javascript:history.back()" style="margin:0 12px">{{ t('back') }}</a>
+</div>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ t('import_btn') }}{% endblock %}
+{% block content %}
+<div class="bg-card rounded-xl p-6 border border-edge text-center mt-10 max-w-md mx-auto">
+  <div class="mx-auto w-10 h-10 mb-3 text-accent">{{ icon('upload','w-10 h-10') }}</div>
+  <div class="mb-6">{{ msg }}</div>
+  <a href="/players" class="inline-block bg-accent hover:bg-accent2 text-bg font-semibold px-6 py-3 rounded-lg transition">{{ t('back_players') }}</a>
+</div>
+{% endblock %}

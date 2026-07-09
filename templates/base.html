@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Dream Academy{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: { bg:'#0B0E13', card:'#11161F', edge:'rgba(255,255,255,0.07)',
+            accent:'#5B9BD5', accent2:'#3D6FA3', ink:'#E8EDF4', dim:'#8593A6' },
+  fontFamily: { sans: ['Inter','IBM Plex Sans Arabic','Segoe UI','sans-serif'] }
+}}}
+</script>
+<style>
+  body { background:#0B0E13; color:#E8EDF4; -webkit-tap-highlight-color: transparent;
+         font-feature-settings: 'tnum'; }
+  .navlink { color:#8593A6; transition: color .15s; }
+  .navlink.active, .navlink:hover { color:#5B9BD5; }
+  input, select, textarea { color-scheme: dark; }
+  ::placeholder { color:#5a6b80; }
+  .num { font-variant-numeric: tabular-nums; }
+  .label-xs { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8593A6; font-weight:600; }
+  button, a, select, input[type=date], input[type=file] { cursor:pointer; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none!important; animation:none!important; } }
+</style>
+{% block head %}{% endblock %}
+</head>
+<body class="min-h-screen pb-24 font-sans antialiased">
+{% from "_icons.html" import icon %}
+<header class="sticky top-0 z-40 bg-bg/95 backdrop-blur border-b border-edge px-4 py-3 flex items-center justify-between">
+  <a href="/" class="flex items-center gap-3">
+    <span class="w-9 h-9 rounded-lg bg-accent/15 border border-accent/40 text-accent grid place-items-center font-extrabold text-sm">DA</span>
+    <span class="leading-tight">
+      <span class="block font-bold text-white text-sm">Dream Academy</span>
+      <span class="block text-dim text-[11px]">{{ t('console_sub') }}</span>
+    </span>
+  </a>
+  <div class="flex items-center gap-2 text-sm">
+    <a href="/lang/{{ 'ar' if lang == 'en' else 'en' }}"
+       class="border border-edge rounded-md px-2.5 py-1.5 text-dim hover:text-accent hover:border-accent/50 transition font-semibold text-xs">
+      {{ 'عربي' if lang == 'en' else 'EN' }}
+    </a>
+    {% if role == 'admin' %}
+    <a href="/qr" class="border border-edge rounded-md p-1.5 text-dim hover:text-accent hover:border-accent/50 transition" title="{{ t('qr_link') }}">{{ icon('qr','w-4 h-4') }}</a>
+    {% endif %}
+    {% if role %}
+    <a href="/logout" class="border border-edge rounded-md p-1.5 text-dim hover:text-accent hover:border-accent/50 transition" title="{{ t('logout') }}">{{ icon('logout','w-4 h-4') }}</a>
+    {% endif %}
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-3 py-4">
+{% block content %}{% endblock %}
+</main>
+
+{% if role %}
+<nav class="fixed bottom-0 inset-x-0 z-40 bg-card border-t border-edge">
+  <div class="max-w-3xl mx-auto grid {% if role == 'admin' %}grid-cols-4{% else %}grid-cols-1{% endif %} text-center text-[11px] font-medium">
+    {% if role == 'admin' %}
+    <a href="/dashboard" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path=='/dashboard' %}active{% endif %}">
+      {{ icon('dashboard','w-5 h-5') }}{{ t('nav_dashboard') }}</a>
+    {% endif %}
+    <a href="/attendance" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path=='/attendance' %}active{% endif %}">
+      {{ icon('attendance','w-5 h-5') }}{{ t('nav_attendance') }}</a>
+    {% if role == 'admin' %}
+    <a href="/players" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/players') %}active{% endif %}">
+      {{ icon('users','w-5 h-5') }}{{ t('nav_players') }}</a>
+    <a href="/payments" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/payments') %}active{% endif %}">
+      {{ icon('wallet','w-5 h-5') }}{{ t('nav_payments') }}</a>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>
