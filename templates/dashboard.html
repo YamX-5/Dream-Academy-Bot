@@ -23,6 +23,39 @@
   </div>
 </div>
 
+{% if pending %}
+<h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
+  <span class="text-amber-400">{{ icon('users','w-4 h-4') }}</span>{{ t('pending_approval') }}
+  <span class="text-xs bg-amber-500/20 text-amber-300 rounded-full px-2 py-0.5 num">{{ pending|length }}</span>
+</h2>
+<div class="space-y-2 mb-6">
+  {% for p in pending %}
+  <div id="pending-{{ p.id }}" class="bg-card rounded-lg px-4 py-3 border border-amber-500/30">
+    <div class="flex items-center justify-between gap-2 mb-2">
+      <div class="min-w-0">
+        <div class="font-semibold truncate">{{ p.full_name }}</div>
+        <div class="text-xs text-dim">
+          {{ p.group_name or '—' }} · {{ t('added_by', who=(t('role_admin') if p.added_by=='admin' else t('role_coach'))) }}
+          {% if p.guardian_phone %} · <span dir="ltr" class="num">{{ p.guardian_phone }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 gap-2 text-sm">
+      <button onclick="approvePlayer({{ p.id }})"
+              class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition">
+        {{ icon('check','w-4 h-4') }}{{ t('approve') }}</button>
+      <a href="/players/{{ p.id }}/edit"
+         class="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-edge py-2 rounded-lg transition">
+        {{ icon('edit','w-3.5 h-3.5') }}{{ t('review') }}</a>
+      <button onclick="rejectPlayer({{ p.id }})"
+              class="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-edge text-red-400 py-2 rounded-lg transition">
+        {{ icon('x','w-4 h-4') }}{{ t('reject') }}</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% if alerts %}
 <h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
   <span class="text-yellow-400">{{ icon('clock','w-4 h-4') }}</span>{{ t('renewal_alerts') }}
@@ -112,5 +145,22 @@ function mk(id,type,data,color){ new Chart(document.getElementById(id),{type,
 mk('attChart','line',{{ att_chart|tojson }},'#5B9BD5');
 mk('revChart','bar',{{ rev_chart|tojson }},'#34d399');
 mk('grpChart','bar',{{ grp_chart|tojson }},'#5B9BD5');
+
+const CONFIRM_REJECT = {{ t('confirm_reject')|tojson }};
+async function approvePlayer(id) {
+  const r = await fetch(`/api/players/${id}/approve`, {method:'POST'});
+  if (r.ok) removeCard(id);
+}
+async function rejectPlayer(id) {
+  if (!confirm(CONFIRM_REJECT)) return;
+  const r = await fetch(`/api/players/${id}/reject`, {method:'POST'});
+  if (r.ok) removeCard(id);
+}
+function removeCard(id) {
+  const el = document.getElementById('pending-' + id);
+  if (el) el.remove();
+  // if that was the last pending card, reload so the section header disappears
+  if (!document.querySelector('[id^="pending-"]')) location.reload();
+}
 </script>
 {% endblock %}

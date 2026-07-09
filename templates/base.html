@@ -25,6 +25,9 @@ tailwind.config = { theme: { extend: {
   .num { font-variant-numeric: tabular-nums; }
   .label-xs { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8593A6; font-weight:600; }
   button, a, select, input[type=date], input[type=file] { cursor:pointer; }
+  summary { list-style:none; }
+  summary::-webkit-details-marker { display:none; }
+  details[open] > summary .group-open\:rotate-180 { transform: rotate(180deg); }
   @media (prefers-reduced-motion: reduce) { * { transition:none!important; animation:none!important; } }
 </style>
 {% block head %}{% endblock %}

@@ -245,6 +245,12 @@ def dashboard():
         "FROM attendance a JOIN players p ON p.id=a.player_id LEFT JOIN groups g ON g.id=a.group_id "
         "WHERE a.unpaid=1 ORDER BY a.session_date DESC").fetchall()
 
+    # players a coach added, waiting for admin approval
+    pending = con.execute(
+        "SELECT p.id, p.full_name, p.guardian_phone, p.added_by, "
+        "COALESCE(g.name_ar, g.name_en) AS group_name FROM players p "
+        "LEFT JOIN groups g ON g.id=p.group_id WHERE p.status='pending' ORDER BY p.id DESC").fetchall()
+
     # charts data
     att_sessions = con.execute(
         "SELECT session_date, SUM(status='present') present FROM attendance "
@@ -263,8 +269,8 @@ def dashboard():
     bdays = [dict(p) for p in players if p["birth_date"] and p["birth_date"][5:7] == mm]
     con.close()
     return render_template("dashboard.html", kpis=kpis, alerts=alerts, unpaid=unpaid,
-                           att_chart=att_chart, rev_chart=rev_chart, grp_chart=grp_chart,
-                           bdays=bdays, public_url=PUBLIC_URL["url"])
+                           pending=pending, att_chart=att_chart, rev_chart=rev_chart,
+                           grp_chart=grp_chart, bdays=bdays, public_url=PUBLIC_URL["url"])
 
 
 # ---------------- players ----------------
@@ -419,6 +425,34 @@ def api_unfreeze(pid):
     return jsonify({"ok": True})
 
 
+@app.route("/api/players/<int:pid>/approve", methods=["POST"])
+@require_role("admin")
+def api_approve(pid):
+    con = db.get_db()
+    con.execute("UPDATE players SET status='active' WHERE id=? AND status='pending'", (pid,))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/players/<int:pid>/reject", methods=["POST"])
+@require_role("admin")
+def api_reject(pid):
+    """Reject a pending player. Delete if they have no records yet, else mark 'left'."""
+    con = db.get_db()
+    p = con.execute("SELECT * FROM players WHERE id=?", (pid,)).fetchone()
+    if p and p["status"] == "pending":
+        has_att = con.execute("SELECT 1 FROM attendance WHERE player_id=? LIMIT 1", (pid,)).fetchone()
+        has_pay = con.execute("SELECT 1 FROM payments WHERE player_id=? LIMIT 1", (pid,)).fetchone()
+        if has_att or has_pay:
+            con.execute("UPDATE players SET status='left' WHERE id=?", (pid,))
+        else:
+            con.execute("DELETE FROM players WHERE id=?", (pid,))
+        con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
+
 # ---------------- attendance ----------------
 
 @app.route("/attendance")
@@ -439,7 +473,7 @@ def api_attendance_list():
     sdate = request.args.get("date") or date.today().isoformat()
     con = db.get_db()
     players = con.execute(
-        "SELECT * FROM players WHERE group_id=? AND status IN ('active','frozen') ORDER BY full_name",
+        "SELECT * FROM players WHERE group_id=? AND status IN ('active','frozen','pending') ORDER BY full_name",
         (gid,)).fetchall()
     marks = {r["player_id"]: r for r in con.execute(
         "SELECT * FROM attendance WHERE session_date=? AND group_id=?", (sdate, gid)).fetchall()}
@@ -452,9 +486,35 @@ def api_attendance_list():
             "status": m["status"] if m else "none",
             "left": info["left"], "paid": info["active"],
             "frozen": p["status"] == "frozen",
+            "pending": p["status"] == "pending",
         })
     con.close()
     return jsonify({"players": out, "date": sdate})
+
+
+@app.route("/api/attendance/add-player", methods=["POST"])
+@require_role("admin", "coach")
+def api_attendance_add_player():
+    data = request.get_json(force=True)
+    name = (data.get("name") or "").strip()
+    gid = data.get("group_id")
+    if not name or not gid:
+        return jsonify({"error": "missing"}), 400
+    gphone = (data.get("guardian_phone") or "").strip()
+    if gphone and not re.fullmatch(r"07\d{8}", gphone):
+        return jsonify({"error": "bad_phone"}), 400
+    con = db.get_db()
+    grp = con.execute("SELECT * FROM groups WHERE id=?", (int(gid),)).fetchone()
+    gender = grp["gender"] if grp and grp["gender"] in ("M", "F") else "M"
+    # admins adding this way still create a pending row so it's reviewed like any other
+    pid = db.add_pending_player(con, name, int(gid), guardian_phone=gphone,
+                                gender=gender, added_by=current_role() or "coach")
+    p = con.execute("SELECT * FROM players WHERE id=?", (pid,)).fetchone()
+    info = player_sub_info(con, p)
+    con.close()
+    return jsonify({"ok": True, "player": {
+        "id": pid, "name": name, "status": "none",
+        "left": info["left"], "paid": info["active"], "frozen": False, "pending": True}})
 
 
 @app.route("/api/attendance/mark", methods=["POST"])

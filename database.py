@@ -107,6 +107,7 @@ def get_db():
 def init_db():
     con = get_db()
     con.executescript(SCHEMA)
+    _migrate(con)
     if con.execute("SELECT COUNT(*) c FROM groups").fetchone()["c"] == 0:
         con.executemany(
             "INSERT INTO groups (name_ar,name_en,min_age,max_age,gender,schedule_days,time_slot) VALUES (?,?,?,?,?,?,?)",
@@ -116,6 +117,13 @@ def init_db():
         con.execute("INSERT INTO settings (id, data) VALUES (1, ?)", (json.dumps(DEFAULT_SETTINGS),))
     con.commit()
     con.close()
+
+
+def _migrate(con):
+    """Add columns introduced after the first release, without touching existing data."""
+    cols = {r["name"] for r in con.execute("PRAGMA table_info(players)").fetchall()}
+    if "added_by" not in cols:
+        con.execute("ALTER TABLE players ADD COLUMN added_by TEXT DEFAULT ''")
 
 
 def get_settings():
@@ -301,6 +309,20 @@ def suggest_group(con, birth_date, gender):
             if best is None or (best["gender"] == "mixed" and g["gender"] != "mixed"):
                 best = g
     return best["id"] if best else None
+
+
+def add_pending_player(con, full_name, group_id, guardian_phone="", gender="M",
+                       birth_date="", added_by="coach"):
+    """Quick add from the court: minimal fields, status=pending for admin review."""
+    cur = con.execute(
+        "INSERT INTO players (full_name,birth_date,gender,phone,guardian_name,guardian_phone,"
+        "group_id,join_date,notes,status,trial_used,added_by) "
+        "VALUES (?,?,?,?,'',?,?,?,'','pending',0,?)",
+        (full_name.strip(), birth_date, gender, "", guardian_phone.strip(),
+         group_id, today_str(), added_by),
+    )
+    con.commit()
+    return cur.lastrowid
 
 
 # ---------- backups ----------

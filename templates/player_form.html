@@ -67,6 +67,7 @@
     <div>
       <label class="label-xs" for="status">{{ t('status') }}</label>
       <select id="status" name="status" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">
+        {% if player and player.status=='pending' %}<option value="pending" selected>{{ t('pending_badge') }}</option>{% endif %}
         <option value="active" {% if not player or player.status=='active' %}selected{% endif %}>{{ t('st_active') }}</option>
         <option value="frozen" {% if player and player.status=='frozen' %}selected{% endif %}>{{ t('st_frozen') }}</option>
         <option value="left" {% if player and player.status=='left' %}selected{% endif %}>{{ t('st_left') }}</option>

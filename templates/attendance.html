@@ -39,6 +39,25 @@
     <div id="copied" class="hidden text-emerald-400 text-sm text-center mt-2" role="status">{{ t('copied_note') }}</div>
   </div>
 </div>
+
+<!-- add-player modal -->
+<div id="addModal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-3">
+  <div class="bg-card rounded-xl p-5 w-full max-w-md border border-edge">
+    <h3 class="font-bold text-lg mb-1">{{ t('add_player_title') }}</h3>
+    <p class="text-xs text-dim mb-4">{{ t('add_player_hint') }}</p>
+    <label class="label-xs" for="npName">{{ t('player_name') }}</label>
+    <input id="npName" type="text" autocomplete="off"
+           class="w-full bg-bg border border-edge rounded-lg px-3 py-3 mt-1 mb-3 focus:border-accent outline-none" />
+    <label class="label-xs" for="npPhone">{{ t('guardian_wa_opt') }}</label>
+    <input id="npPhone" type="tel" inputmode="tel" placeholder="07XXXXXXXX"
+           class="w-full bg-bg border border-edge rounded-lg px-3 py-3 mt-1 mb-4 num focus:border-accent outline-none" />
+    <div id="npError" class="hidden text-red-400 text-sm mb-3" role="alert"></div>
+    <div class="flex gap-2">
+      <button id="npSubmit" onclick="submitAdd()" class="flex-1 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('add') }}</button>
+      <button onclick="document.getElementById('addModal').classList.add('hidden')" class="px-4 bg-white/5 hover:bg-white/10 border border-edge rounded-lg transition">{{ t('cancel') }}</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -47,7 +66,12 @@ const I18N = {
   left:   {{ t('left_badge')|tojson }},
   noSub:  {{ t('no_sub_badge')|tojson }},
   frozen: {{ t('frozen_badge')|tojson }},
-  saveError: {{ t('save_error')|tojson }}
+  saveError: {{ t('save_error')|tojson }},
+  newBadge: {{ t('new_badge')|tojson }},
+  addPlayer: {{ t('add_player')|tojson }},
+  addFailed: {{ t('add_failed')|tojson }},
+  add: {{ t('add')|tojson }},
+  adding: {{ t('adding')|tojson }}
 };
 const SVG = {
   present: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
@@ -103,6 +127,7 @@ function render() {
         ${p.paid ? I18N.left.replace('{n}', p.left) : `<span class="text-red-400">${I18N.noSub}</span>`}
       </div>
       ${p.frozen ? `<div class="text-[10px] uppercase tracking-wide text-sky-300 mt-0.5">${I18N.frozen}</div>` : ''}
+      ${p.pending ? `<span class="absolute top-1.5 ${document.documentElement.dir==='rtl'?'right-1.5':'left-1.5'} text-[9px] uppercase tracking-wide bg-amber-500/25 text-amber-200 rounded px-1 py-0.5">${I18N.newBadge}</span>` : ''}
       ${p.status !== 'none' ? `<span class="absolute top-1.5 ${document.documentElement.dir==='rtl'?'left-1.5':'right-1.5'} w-6 h-6 rounded-md grid place-items-center ${CHIP[p.status]}">${SVG[p.status]}</span>` : ''}`;
     // tap cycles, long-press = excused
     let timer = null, longFired = false;
@@ -116,6 +141,13 @@ function render() {
     card.addEventListener('contextmenu', e => e.preventDefault());
     grid.appendChild(card);
   });
+  // quick "add player" tile
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'rounded-lg border border-dashed border-accent/50 text-accent px-2 py-4 flex flex-col items-center justify-center gap-1 hover:bg-accent/10 transition min-h-[76px]';
+  add.innerHTML = `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span class="text-xs font-semibold">${I18N.addPlayer}</span>`;
+  add.addEventListener('click', openAdd);
+  grid.appendChild(add);
   updateCounter();
 }
 
@@ -133,6 +165,34 @@ async function mark(p, status) {
 function updateCounter() {
   document.getElementById('pcount').textContent = players.filter(p=>p.status==='present').length;
   document.getElementById('tcount').textContent = players.length;
+}
+
+function openAdd() {
+  document.getElementById('npName').value = '';
+  document.getElementById('npPhone').value = '';
+  document.getElementById('npError').classList.add('hidden');
+  document.getElementById('addModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('npName').focus(), 50);
+}
+
+async function submitAdd() {
+  const name = document.getElementById('npName').value.trim();
+  const phone = document.getElementById('npPhone').value.trim();
+  const err = document.getElementById('npError');
+  const btn = document.getElementById('npSubmit');
+  if (!name) { err.textContent = I18N.addFailed; err.classList.remove('hidden'); return; }
+  btn.disabled = true; btn.textContent = I18N.adding;
+  const r = await fetch('/api/attendance/add-player', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, guardian_phone: phone, group_id: groupSel.value})
+  });
+  btn.disabled = false; btn.textContent = I18N.add;
+  if (!r.ok) { err.textContent = I18N.addFailed; err.classList.remove('hidden'); return; }
+  const d = await r.json();
+  players.push(d.player);
+  players.sort((a, b) => a.name.localeCompare(b.name));
+  document.getElementById('addModal').classList.add('hidden');
+  render();
 }
 
 document.getElementById('closeBtn').addEventListener('click', async () => {

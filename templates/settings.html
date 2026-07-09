@@ -56,51 +56,87 @@
 </form>
 
 <h2 class="font-semibold mb-2 text-white">{{ t('groups_title') }}</h2>
-<div class="space-y-3">
+<div class="space-y-2">
   {% for g in groups %}
-  <form method="post" action="/groups/save" class="bg-card rounded-lg p-3 border border-edge grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-    <input type="hidden" name="id" value="{{ g.id }}">
-    <input name="name_ar" value="{{ g.name_ar }}" dir="rtl" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none" placeholder="{{ t('grp_name_ar') }}">
-    <input name="name_en" value="{{ g.name_en }}" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none" placeholder="{{ t('grp_name_en') }}">
-    <div class="flex gap-1 items-center">
-      <input name="min_age" type="number" value="{{ g.min_age }}" class="w-full bg-bg border border-edge rounded-lg px-2 py-2 num focus:border-accent outline-none" title="{{ t('from_age') }}">
-      <span class="text-dim">–</span>
-      <input name="max_age" type="number" value="{{ g.max_age }}" class="w-full bg-bg border border-edge rounded-lg px-2 py-2 num focus:border-accent outline-none" title="{{ t('to_age') }}">
+  <details class="bg-card rounded-lg border {{ 'border-red-500/50' if group_error == g.id else 'border-edge' }} group" {% if group_error == g.id %}open{% endif %}>
+    <summary class="px-4 py-3 flex items-center justify-between cursor-pointer select-none list-none">
+      <div class="min-w-0">
+        <div class="font-semibold truncate">{{ g.name_ar }} <span class="text-dim font-normal">/ {{ g.name_en }}</span></div>
+        <div class="text-xs text-dim num">{{ g.time_slot or '—' }} · {{ t('players_in_group', n=g.player_count) }}</div>
+      </div>
+      <svg class="w-4 h-4 text-dim shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </summary>
+    <div class="px-4 pb-4 pt-1 border-t border-edge space-y-3">
+      {% if group_error == g.id %}
+      <div class="text-red-400 text-xs bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{{ t('group_has_players', n=g.player_count) }}</div>
+      {% endif %}
+      <form method="post" action="/groups/save" class="space-y-3">
+        <input type="hidden" name="id" value="{{ g.id }}">
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="label-xs">{{ t('grp_name_ar') }}</label>
+            <input name="name_ar" value="{{ g.name_ar }}" dir="rtl" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none"></div>
+          <div><label class="label-xs">{{ t('grp_name_en') }}</label>
+            <input name="name_en" value="{{ g.name_en }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div><label class="label-xs">{{ t('from_age') }}</label>
+            <input name="min_age" type="number" value="{{ g.min_age }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 num focus:border-accent outline-none"></div>
+          <div><label class="label-xs">{{ t('to_age') }}</label>
+            <input name="max_age" type="number" value="{{ g.max_age }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 num focus:border-accent outline-none"></div>
+          <div><label class="label-xs">{{ t('gender') }}</label>
+            <select name="gender" class="w-full bg-bg border border-edge rounded-lg px-2 py-2.5 mt-1 focus:border-accent outline-none">
+              <option value="mixed" {% if g.gender=='mixed' %}selected{% endif %}>{{ t('mixed') }}</option>
+              <option value="M" {% if g.gender=='M' %}selected{% endif %}>{{ t('males') }}</option>
+              <option value="F" {% if g.gender=='F' %}selected{% endif %}>{{ t('females') }}</option>
+            </select></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="label-xs">{{ t('training_days') }}</label>
+            <input name="schedule_days" value="{{ g.schedule_days }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="Sun/Tue/Thu"></div>
+          <div><label class="label-xs">{{ t('time_slot') }}</label>
+            <input name="time_slot" value="{{ g.time_slot }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="4:00–5:30"></div>
+        </div>
+        <button class="w-full bg-white/5 hover:bg-white/10 border border-edge rounded-lg py-2.5 transition font-medium">{{ t('save_group') }}</button>
+      </form>
+      <form method="post" action="/groups/{{ g.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_group')|tojson }})" class="text-center">
+        <button class="text-red-400 hover:text-red-300 text-xs font-medium transition">{{ t('delete_group') }}</button>
+      </form>
     </div>
-    <select name="gender" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
-      <option value="mixed" {% if g.gender=='mixed' %}selected{% endif %}>{{ t('mixed') }}</option>
-      <option value="M" {% if g.gender=='M' %}selected{% endif %}>{{ t('males') }}</option>
-      <option value="F" {% if g.gender=='F' %}selected{% endif %}>{{ t('females') }}</option>
-    </select>
-    <input name="schedule_days" value="{{ g.schedule_days }}" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none" placeholder="Sun/Tue/Thu">
-    <input name="time_slot" value="{{ g.time_slot }}" class="bg-bg border border-edge rounded-lg px-2 py-2 num focus:border-accent outline-none" placeholder="4:00–5:30">
-    <button class="col-span-2 bg-white/5 hover:bg-white/10 border border-edge rounded-lg py-2 transition">{{ t('save_group') }}</button>
-  </form>
-  {% if group_error == g.id %}
-  <div class="text-red-400 text-xs px-1 -mt-1">{{ t('group_has_players', n=g.player_count) }}</div>
-  {% endif %}
-  <div class="flex items-center justify-between px-1 -mt-1">
-    <span class="text-dim text-xs">{{ t('players_in_group', n=g.player_count) }}</span>
-    <form method="post" action="/groups/{{ g.id }}/delete"
-          onsubmit="return confirm({{ t('confirm_delete_group')|tojson }})">
-      <button class="text-red-400 hover:text-red-300 text-xs font-medium transition">{{ t('delete_group') }}</button>
-    </form>
-  </div>
+  </details>
   {% endfor %}
-  <form method="post" action="/groups/save" class="bg-card rounded-lg p-3 border border-dashed border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-    <input name="name_ar" required dir="rtl" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none" placeholder="{{ t('new_group_ph') }}">
-    <input name="name_en" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none" placeholder="{{ t('grp_name_en') }}">
-    <div class="flex gap-1 items-center">
-      <input name="min_age" type="number" placeholder="{{ t('from_age') }}" class="w-full bg-bg border border-edge rounded-lg px-2 py-2 num focus:border-accent outline-none">
-      <span class="text-dim">–</span>
-      <input name="max_age" type="number" placeholder="{{ t('to_age') }}" class="w-full bg-bg border border-edge rounded-lg px-2 py-2 num focus:border-accent outline-none">
+
+  <details class="bg-card rounded-lg border border-dashed border-white/15">
+    <summary class="px-4 py-3 flex items-center gap-2 cursor-pointer select-none list-none text-accent font-medium">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      {{ t('add_group') }}
+    </summary>
+    <div class="px-4 pb-4 pt-1 border-t border-edge">
+      <form method="post" action="/groups/save" class="space-y-3 mt-3">
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="label-xs">{{ t('grp_name_ar') }}</label>
+            <input name="name_ar" required dir="rtl" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="{{ t('new_group_ph') }}"></div>
+          <div><label class="label-xs">{{ t('grp_name_en') }}</label>
+            <input name="name_en" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none"></div>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div><label class="label-xs">{{ t('from_age') }}</label>
+            <input name="min_age" type="number" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 num focus:border-accent outline-none"></div>
+          <div><label class="label-xs">{{ t('to_age') }}</label>
+            <input name="max_age" type="number" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 num focus:border-accent outline-none"></div>
+          <div><label class="label-xs">{{ t('gender') }}</label>
+            <select name="gender" class="w-full bg-bg border border-edge rounded-lg px-2 py-2.5 mt-1 focus:border-accent outline-none">
+              <option value="mixed">{{ t('mixed') }}</option><option value="M">{{ t('males') }}</option><option value="F">{{ t('females') }}</option>
+            </select></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="label-xs">{{ t('training_days') }}</label>
+            <input name="schedule_days" value="Sun/Tue/Thu" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none"></div>
+          <div><label class="label-xs">{{ t('time_slot') }}</label>
+            <input name="time_slot" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="4:00–5:30"></div>
+        </div>
+        <button class="w-full bg-accent hover:bg-accent2 text-bg font-semibold rounded-lg py-2.5 transition">{{ t('add_group') }}</button>
+      </form>
     </div>
-    <select name="gender" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
-      <option value="mixed">{{ t('mixed') }}</option><option value="M">{{ t('males') }}</option><option value="F">{{ t('females') }}</option>
-    </select>
-    <input name="schedule_days" value="Sun/Tue/Thu" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
-    <input name="time_slot" class="bg-bg border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none" placeholder="{{ t('time_slot') }}">
-    <button class="col-span-2 bg-accent hover:bg-accent2 text-bg font-semibold rounded-lg py-2 transition">{{ t('add_group') }}</button>
-  </form>
+  </details>
 </div>
 {% endblock %}
