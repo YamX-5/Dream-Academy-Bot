@@ -2,18 +2,22 @@
 {% from "_icons.html" import icon %}
 {% block title %}{{ p.full_name }}{% endblock %}
 {% block content %}
-<div class="flex items-start justify-between mb-4">
-  <div>
-    <h1 class="text-xl font-bold text-white flex items-center gap-2">{{ p.full_name }}
-      {% if p.status=='frozen' %}<span class="text-[10px] uppercase tracking-wide text-sky-300 border border-sky-500/40 rounded px-1.5 py-0.5">{{ t('st_frozen') }}</span>{% endif %}
-      {% if p.status=='left' %}<span class="text-[10px] uppercase tracking-wide text-dim border border-edge rounded px-1.5 py-0.5">{{ t('st_left') }}</span>{% endif %}
+{% set avatar_palette = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
+{% set parts = p.full_name.split() %}
+<div class="flex items-start gap-3 mb-4">
+  <span class="av !w-12 !h-12 !text-lg" style="background: {{ avatar_palette[p.id % 6] }}">{{ parts[0][0] }}{{ parts[1][0] if parts|length > 1 else '' }}</span>
+  <div class="flex-1 min-w-0">
+    <h1 class="text-xl font-bold text-white flex items-center gap-2 flex-wrap">{{ p.full_name }}
+      {% if p.status=='pending' %}<span class="pill pill-warn">{{ t('pending_badge') }}</span>{% endif %}
+      {% if p.status=='frozen' %}<span class="pill pill-sky">{{ t('st_frozen') }}</span>{% endif %}
+      {% if p.status=='left' %}<span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}
     </h1>
     <div class="text-sm text-dim mt-1">
       {{ p.group_name or t('no_group') }} · {{ t('male') if p.gender=='M' else t('female') }}
       {% if p.birth_date %} · {{ t('born') }} <span class="num">{{ p.birth_date }}</span>{% endif %}
     </div>
     {% if p.guardian_name %}<div class="text-sm text-dim">{{ t('guardian_label') }}: {{ p.guardian_name }} — <span dir="ltr" class="num">{{ p.guardian_phone }}</span></div>{% endif %}
-    {% if p.notes %}<div class="text-sm text-yellow-200/90 mt-1">{{ p.notes }}</div>{% endif %}
+    {% if p.notes %}<div class="text-sm text-warn mt-1">{{ p.notes }}</div>{% endif %}
   </div>
   <a href="/players/{{ p.id }}/edit" class="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-edge px-3 py-2 rounded-lg text-sm shrink-0 transition">
     {{ icon('edit','w-3.5 h-3.5') }}{{ t('edit') }}</a>

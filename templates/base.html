@@ -6,29 +6,69 @@
 <title>{% block title %}Dream Academy{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = { theme: { extend: {
-  colors: { bg:'#0B0E13', card:'#11161F', edge:'rgba(255,255,255,0.07)',
-            accent:'#5B9BD5', accent2:'#3D6FA3', ink:'#E8EDF4', dim:'#8593A6' },
-  fontFamily: { sans: ['Inter','IBM Plex Sans Arabic','Segoe UI','sans-serif'] }
+  colors: {
+    bg:'#0B0E13', card:'#141922', card2:'#1B2230', card3:'#232C3B',
+    edge:'#262F3F', edge2:'#1E2634',
+    accent:'#5B9BD5', accent2:'#3D6FA3', ink:'#E9EEF6', dim:'#8B95A7', faint:'#5C6678',
+    ok:'#34C759', warn:'#F5A623', bad:'#F04438', violet:'#8B5CF6', wa:'#25D366'
+  },
+  fontFamily: { sans: ['Cairo','Segoe UI','system-ui','sans-serif'] },
+  borderRadius: { DEFAULT:'10px', md:'12px', lg:'14px', xl:'18px', '2xl':'22px', '3xl':'26px' }
 }}}
 </script>
 <style>
-  body { background:#0B0E13; color:#E8EDF4; -webkit-tap-highlight-color: transparent;
-         font-feature-settings: 'tnum'; }
-  .navlink { color:#8593A6; transition: color .15s; }
-  .navlink.active, .navlink:hover { color:#5B9BD5; }
+  body { background:#0B0E13; color:#E9EEF6; font-weight:500; letter-spacing:0;
+         -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color: transparent; }
+  h1,h2,h3,h4 { letter-spacing:0; }
+  /* soft depth on every surface card — the gym-radar feel */
+  .bg-card { box-shadow: 0 1px 0 rgba(255,255,255,.02) inset, 0 10px 26px -18px rgba(0,0,0,.65); }
+  /* gradient primary + glow (only solid accent buttons, not tinted badges) */
+  .bg-accent { background-image: linear-gradient(140deg, #6BA8DE, #3D6FA3);
+               box-shadow: 0 10px 22px -12px rgba(91,155,213,.55); }
+  .bg-accent:hover { filter: brightness(1.06); }
+  /* focus glow */
+  input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(91,155,213,.18); }
   input, select, textarea { color-scheme: dark; }
-  ::placeholder { color:#5a6b80; }
-  .num { font-variant-numeric: tabular-nums; }
-  .label-xs { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#8593A6; font-weight:600; }
+  ::placeholder { color:#5C6678; }
+  /* numbers/phones: mono + tabular, always LTR */
+  .num { font-family: ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-variant-numeric: tabular-nums;
+         direction: ltr; unicode-bidi: isolate; }
+  .label-xs { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#8B95A7; font-weight:700; }
   button, a, select, input[type=date], input[type=file] { cursor:pointer; }
   summary { list-style:none; }
   summary::-webkit-details-marker { display:none; }
   details[open] > summary .group-open\:rotate-180 { transform: rotate(180deg); }
-  @media (prefers-reduced-motion: reduce) { * { transition:none!important; animation:none!important; } }
+  /* bottom-nav active accent */
+  .navlink { color:#8B95A7; transition: color .15s; position:relative; }
+  .navlink.active, .navlink:hover { color:#5B9BD5; }
+  .navlink.active::before { content:''; position:absolute; top:0; inset-inline-start:50%; transform:translateX(-50%);
+    width:26px; height:3px; border-radius:0 0 4px 4px; background:#5B9BD5; }
+  /* avatar (initials) */
+  .av { flex:none; display:grid; place-items:center; border-radius:50%; font-weight:800; color:#fff;
+        width:38px; height:38px; font-size:14px; }
+  /* pill badges */
+  .pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:800;
+          padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  .pill-ok{color:#34C759;background:rgba(52,199,89,.14)} .pill-warn{color:#F5A623;background:rgba(245,166,35,.15)}
+  .pill-bad{color:#F04438;background:rgba(240,68,56,.14)} .pill-sky{color:#5B9BD5;background:rgba(91,155,213,.16)}
+  .pill-violet{color:#8B5CF6;background:rgba(139,92,246,.15)} .pill-muted{color:#8B95A7;background:#232C3B}
+  /* KPI card with top accent bar */
+  .kpi { position:relative; overflow:hidden; }
+  .kpi::before { content:''; position:absolute; top:0; inset-inline-start:0; width:100%; height:3px;
+    background:linear-gradient(90deg,#5B9BD5,#3D6FA3); opacity:.9; }
+  .kpi.kpi-warn::before { background:#F5A623; } .kpi.kpi-bad::before { background:#F04438; }
+  .kpi.kpi-ok::before { background:#34C759; }
+  /* brand tile */
+  .brand-logo { background:linear-gradient(140deg,#5B9BD5,#3D6FA3); color:#0B0E13;
+                box-shadow:0 6px 18px -6px rgba(91,155,213,.5); }
+  /* rise-in on load */
+  .rise { opacity:0; transform:translateY(10px); animation:rise .45s cubic-bezier(.2,.8,.2,1) forwards; }
+  @keyframes rise { to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce) { *, .rise { animation:none!important; transition:none!important; opacity:1!important; transform:none!important; } }
 </style>
 {% block head %}{% endblock %}
 </head>
@@ -36,7 +76,7 @@ tailwind.config = { theme: { extend: {
 {% from "_icons.html" import icon %}
 <header class="sticky top-0 z-40 bg-bg/95 backdrop-blur border-b border-edge px-4 py-3 flex items-center justify-between">
   <a href="/" class="flex items-center gap-3">
-    <span class="w-9 h-9 rounded-lg bg-accent/15 border border-accent/40 text-accent grid place-items-center font-extrabold text-sm">DA</span>
+    <span class="brand-logo w-9 h-9 rounded-xl grid place-items-center font-extrabold text-sm">DA</span>
     <span class="leading-tight">
       <span class="block font-bold text-white text-sm">Dream Academy</span>
       <span class="block text-dim text-[11px]">{{ t('console_sub') }}</span>
@@ -56,7 +96,7 @@ tailwind.config = { theme: { extend: {
   </div>
 </header>
 
-<main class="max-w-3xl mx-auto px-3 py-4">
+<main class="max-w-3xl mx-auto px-3 py-4 rise">
 {% block content %}{% endblock %}
 </main>
 

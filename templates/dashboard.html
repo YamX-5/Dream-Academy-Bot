@@ -4,22 +4,22 @@
 {% block content %}
 <h1 class="text-xl font-bold text-white mb-4">{{ t('dash_title') }}</h1>
 
-<div class="grid grid-cols-2 gap-2 mb-6">
-  <div class="bg-card rounded-lg p-4 border border-edge">
+<div class="grid grid-cols-2 gap-2.5 mb-6">
+  <div class="kpi bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_active') }}</div>
-    <div class="text-2xl font-bold num text-white">{{ kpis.active_players }}</div>
+    <div class="text-2xl font-extrabold num text-white">{{ kpis.active_players }}</div>
   </div>
-  <div class="bg-card rounded-lg p-4 border border-edge">
+  <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_present') }}</div>
-    <div class="text-2xl font-bold num text-white">{{ kpis.present_today }}</div>
+    <div class="text-2xl font-extrabold num text-white">{{ kpis.present_today }}</div>
   </div>
-  <div class="bg-card rounded-lg p-4 border border-edge">
+  <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_revenue') }}</div>
-    <div class="text-2xl font-bold num text-emerald-400">{{ kpis.revenue_month }} <span class="text-sm font-medium">JD</span></div>
+    <div class="text-2xl font-extrabold num text-ok">{{ kpis.revenue_month }} <span class="text-sm font-semibold">JD</span></div>
   </div>
-  <div class="bg-card rounded-lg p-4 border {{ 'border-red-500/50' if kpis.unpaid_count else 'border-edge' }}">
+  <div class="kpi {{ 'kpi-bad' if kpis.unpaid_count else '' }} bg-card rounded-xl p-4 border {{ 'border-bad/50' if kpis.unpaid_count else 'border-edge' }}">
     <div class="label-xs mb-1">{{ t('kpi_unpaid') }}</div>
-    <div class="text-2xl font-bold num {{ 'text-red-400' if kpis.unpaid_count else 'text-white' }}">{{ kpis.unpaid_count }}</div>
+    <div class="text-2xl font-extrabold num {{ 'text-bad' if kpis.unpaid_count else 'text-white' }}">{{ kpis.unpaid_count }}</div>
   </div>
 </div>
 

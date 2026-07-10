@@ -38,24 +38,28 @@
   <button class="bg-white/5 hover:bg-white/10 border border-edge px-4 py-2 rounded-lg text-sm transition">{{ t('apply_filter') }}</button>
 </form>
 
+{% set avatar_palette = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
 <div class="space-y-2">
   {% for item in players %}
   {% set p = item.p %}{% set info = item.info %}
-  <a href="/players/{{ p.id }}" class="block bg-card rounded-lg px-4 py-3 border transition hover:border-accent/40
-     {{ 'border-red-500/40' if info.needs_renewal else 'border-edge' }}">
-    <div class="flex items-center justify-between">
-      <div class="font-semibold">{{ p.full_name }}
-        {% if p.status=='pending' %}<span class="text-[10px] uppercase tracking-wide text-amber-300 border border-amber-500/40 rounded px-1.5 py-0.5 {{ 'mr-1' if dir == 'rtl' else 'ml-1' }}">{{ t('pending_badge') }}</span>{% endif %}
-        {% if p.status=='frozen' %}<span class="text-[10px] uppercase tracking-wide text-sky-300 border border-sky-500/40 rounded px-1.5 py-0.5 {{ 'mr-1' if dir == 'rtl' else 'ml-1' }}">{{ t('st_frozen') }}</span>{% endif %}
-        {% if p.status=='left' %}<span class="text-[10px] uppercase tracking-wide text-dim border border-edge rounded px-1.5 py-0.5 {{ 'mr-1' if dir == 'rtl' else 'ml-1' }}">{{ t('st_left') }}</span>{% endif %}
+  {% set parts = p.full_name.split() %}
+  <a href="/players/{{ p.id }}" class="flex items-center gap-3 bg-card rounded-xl px-3.5 py-3 border transition hover:border-accent/40
+     {{ 'border-bad/40' if info.needs_renewal else 'border-edge' }}">
+    <span class="av" style="background: {{ avatar_palette[p.id % 6] }}">{{ parts[0][0] }}{{ parts[1][0] if parts|length > 1 else '' }}</span>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2">
+        <span class="font-bold truncate">{{ p.full_name }}</span>
+        {% if p.status=='pending' %}<span class="pill pill-warn">{{ t('pending_badge') }}</span>{% endif %}
+        {% if p.status=='frozen' %}<span class="pill pill-sky">{{ t('st_frozen') }}</span>{% endif %}
+        {% if p.status=='left' %}<span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}
       </div>
-      <div class="text-xs text-dim">{{ p.group_name or '—' }}</div>
+      <div class="text-xs mt-0.5 num {{ 'text-bad' if not info.active else ('text-warn' if info.needs_renewal else 'text-dim') }}">
+        {% if info.active %}
+          {{ t('left_expires', n=info.left, d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7]) }}
+        {% else %}{{ t('no_active_sub') }}{% endif %}
+      </div>
     </div>
-    <div class="text-sm mt-1 num {{ 'text-red-400' if not info.active else 'text-dim' }}">
-      {% if info.active %}
-        {{ t('left_expires', n=info.left, d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7]) }}
-      {% else %}{{ t('no_active_sub') }}{% endif %}
-    </div>
+    <div class="text-[11px] text-dim shrink-0 text-end">{{ p.group_name or '—' }}</div>
   </a>
   {% else %}
   <div class="text-center text-dim py-10">{{ t('no_results') }}</div>
