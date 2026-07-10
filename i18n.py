@@ -6,8 +6,21 @@ T = {
 "en": {
     # nav / shell
     "nav_dashboard": "Dashboard", "nav_attendance": "Attendance",
-    "nav_players": "Players", "nav_payments": "Payments",
+    "nav_players": "Players", "nav_payments": "Payments", "nav_analytics": "Insights",
     "logout": "Logout", "qr_link": "Access QR", "console_sub": "Management Console",
+    # assistant
+    "assistant_title": "Academy Assistant", "assistant_sub": "Ask about players, dues & attendance",
+    "assistant_greeting": "Hi. Ask me anything about your players, attendance, or revenue.",
+    "assistant_ph": "Type your question…", "assistant_err": "Something went wrong — try again.",
+    "assistant_open": "Assistant",
+    # analytics
+    "analytics_title": "Insights", "an_total": "Total players", "an_active": "Active",
+    "an_rate": "Attendance", "an_revenue": "Revenue (month)",
+    "an_ai_insights": "AI insights", "an_at_risk": "At-risk players",
+    "an_at_risk_sub": "Below 50% attendance — may drop out",
+    "an_chart_rate": "Attendance rate per session", "an_chart_rev": "Revenue per month (JD)",
+    "an_chart_groups": "Attendance rate by group", "an_chart_new": "New players per month",
+    "an_no_risk": "No at-risk players — attendance looks healthy.", "an_players": "players",
     # login
     "enter_pin": "Enter PIN", "login_btn": "Login",
     "wrong_pin": "Wrong PIN, try again",
@@ -136,8 +149,19 @@ T = {
 },
 "ar": {
     "nav_dashboard": "الرئيسية", "nav_attendance": "الحضور",
-    "nav_players": "اللاعبين", "nav_payments": "الدفعات",
+    "nav_players": "اللاعبين", "nav_payments": "الدفعات", "nav_analytics": "تحليلات",
     "logout": "خروج", "qr_link": "رمز الدخول", "console_sub": "لوحة الإدارة",
+    "assistant_title": "مساعد الأكاديمية", "assistant_sub": "اسألني عن اللاعبين والاشتراكات والحضور",
+    "assistant_greeting": "أهلاً. اسألني أي إشي عن اللاعبين أو الحضور أو الإيراد.",
+    "assistant_ph": "اكتب سؤالك…", "assistant_err": "صار خطأ — جرّب كمان مرة.",
+    "assistant_open": "المساعد",
+    "analytics_title": "تحليلات", "an_total": "إجمالي اللاعبين", "an_active": "الفعالين",
+    "an_rate": "الحضور", "an_revenue": "إيراد الشهر",
+    "an_ai_insights": "تحليلات ذكية", "an_at_risk": "لاعبين معرّضين للترك",
+    "an_at_risk_sub": "حضورهم أقل من 50٪ — ممكن يتركوا",
+    "an_chart_rate": "نسبة الحضور بكل حصة", "an_chart_rev": "الإيراد الشهري (دينار)",
+    "an_chart_groups": "نسبة الحضور حسب المجموعة", "an_chart_new": "لاعبين جدد بالشهر",
+    "an_no_risk": "ما في لاعبين معرّضين — الحضور ممتاز.", "an_players": "لاعب",
     "enter_pin": "أدخل الرقم السري", "login_btn": "دخول",
     "wrong_pin": "الرقم غلط، جرّب مرة ثانية",
     "choose_group": "اختر المجموعة…", "pick_group_prompt": "اختر مجموعة عشان تبلش التحضير",

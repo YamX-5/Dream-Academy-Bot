@@ -91,6 +91,39 @@ tailwind.config = { theme: { extend: {
   .gr-empty { padding:20px; text-align:center; color:#8B95A7; font-size:13px; }
   .rise { opacity:0; transform:translateY(10px); animation:rise .45s cubic-bezier(.2,.8,.2,1) forwards; }
   @keyframes rise { to { opacity:1; transform:none; } }
+  /* ===== assistant (fake AI) ===== */
+  .fab { position:fixed; inset-block-end:calc(64px + env(safe-area-inset-bottom) + 14px); inset-inline-end:16px; z-index:60;
+    width:54px; height:54px; border-radius:50%; border:none; display:grid; place-items:center;
+    background:linear-gradient(140deg,var(--acc),var(--acc2)); color:#08151d;
+    box-shadow:0 12px 28px -8px var(--acc-glow); animation:fabpop .3s ease-out; }
+  .fab:hover { filter:brightness(1.06); transform:scale(1.05); }
+  @keyframes fabpop { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+  .scrim { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(2px); z-index:110;
+    opacity:0; transition:opacity .25s; }
+  .scrim.show { opacity:1; }
+  .chat { position:fixed; inset-block:0; inset-inline-end:0; width:420px; max-width:94vw; z-index:120;
+    background:#141922; border-inline-start:1px solid var(--edge); display:flex; flex-direction:column;
+    transform:translateX(102%); transition:transform .3s cubic-bezier(.2,.8,.2,1); }
+  [dir="rtl"] .chat { transform:translateX(-102%); }
+  .chat.show { transform:none; }
+  .chat-hd { padding:15px 16px; border-bottom:1px solid var(--edge2); display:flex; align-items:center; gap:11px; }
+  .chat-ava { width:40px; height:40px; border-radius:12px; display:grid; place-items:center; flex:none;
+    background:linear-gradient(140deg,var(--acc),var(--acc2)); color:#08151d; }
+  .chat-body { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:11px; }
+  .chat-foot { padding:12px 14px; border-top:1px solid var(--edge2); }
+  .bub { max-width:82%; padding:11px 14px; border-radius:16px; font-size:14px; line-height:1.7; white-space:pre-line; }
+  .bub.bot { background:#1B2230; align-self:flex-start; border-end-start-radius:5px; }
+  .bub.me { background:linear-gradient(140deg,var(--acc),var(--acc2)); color:#08151d; font-weight:600; align-self:flex-end; border-end-end-radius:5px; }
+  .botrows { align-self:flex-start; width:100%; display:flex; flex-direction:column; gap:7px; }
+  .botrow { display:flex; align-items:center; gap:10px; background:#0B0E13; border:1px solid var(--edge); border-radius:12px; padding:8px 10px; }
+  .typing { align-self:flex-start; background:#1B2230; border-radius:16px; padding:12px 15px; display:flex; gap:5px; }
+  .typing i { width:6px; height:6px; border-radius:50%; background:var(--acc); animation:blink 1s infinite; }
+  .typing i:nth-child(2){animation-delay:.2s} .typing i:nth-child(3){animation-delay:.4s}
+  @keyframes blink { 0%,80%,100%{opacity:.25} 40%{opacity:1} }
+  .chatchips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:9px; }
+  .chatchips .chip { border:1px solid var(--edge); background:#0B0E13; color:#8B95A7; border-radius:99px;
+    padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; transition:.14s; }
+  .chatchips .chip:hover { color:var(--acc); border-color:var(--acc); }
   @media (prefers-reduced-motion: reduce) { *, .rise { animation:none!important; transition:none!important; opacity:1!important; transform:none!important; } }
 </style>
 {% block head %}{% endblock %}
@@ -125,7 +158,7 @@ tailwind.config = { theme: { extend: {
 
 {% if role %}
 <nav class="fixed bottom-0 inset-x-0 z-40 bg-card border-t border-edge">
-  <div class="max-w-3xl mx-auto grid {% if role == 'admin' %}grid-cols-4{% else %}grid-cols-1{% endif %} text-center text-[11px] font-medium">
+  <div class="max-w-3xl mx-auto grid {% if role == 'admin' %}grid-cols-5{% else %}grid-cols-1{% endif %} text-center text-[11px] font-medium">
     {% if role == 'admin' %}
     <a href="/dashboard" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path=='/dashboard' %}active{% endif %}">
       {{ icon('dashboard','w-5 h-5') }}{{ t('nav_dashboard') }}</a>
@@ -135,11 +168,93 @@ tailwind.config = { theme: { extend: {
     {% if role == 'admin' %}
     <a href="/players" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/players') %}active{% endif %}">
       {{ icon('users','w-5 h-5') }}{{ t('nav_players') }}</a>
+    <a href="/analytics" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/analytics') %}active{% endif %}">
+      {{ icon('analytics','w-5 h-5') }}{{ t('nav_analytics') }}</a>
     <a href="/payments" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/payments') %}active{% endif %}">
       {{ icon('wallet','w-5 h-5') }}{{ t('nav_payments') }}</a>
     {% endif %}
   </div>
 </nav>
+
+<!-- assistant -->
+<button class="fab" onclick="Bot.open()" aria-label="{{ t('assistant_open') }}">{{ icon('sparkle','w-6 h-6') }}</button>
+<div id="botScrim" class="scrim hidden" onclick="Bot.close()"></div>
+<div id="botDrawer" class="chat" role="dialog" aria-label="{{ t('assistant_title') }}">
+  <div class="chat-hd">
+    <div class="chat-ava">{{ icon('sparkle','w-5 h-5') }}</div>
+    <div class="flex-1 min-w-0">
+      <div class="font-bold text-sm">{{ t('assistant_title') }}</div>
+      <div class="text-[11px] text-dim truncate">{{ t('assistant_sub') }}</div>
+    </div>
+    <button onclick="Bot.close()" class="w-8 h-8 grid place-items-center rounded-lg border border-edge text-dim hover:text-ink transition">{{ icon('x','w-4 h-4') }}</button>
+  </div>
+  <div class="chat-body" id="chatBody"></div>
+  <div class="chat-foot">
+    <div class="chatchips" id="chatChips"></div>
+    <div class="flex gap-2">
+      <input id="chatInput" class="flex-1 bg-bg border border-edge rounded-lg px-3 py-2.5 text-sm focus:border-accent outline-none"
+             placeholder="{{ t('assistant_ph') }}" onkeydown="if(event.key==='Enter')Bot.send()">
+      <button onclick="Bot.send()" class="bg-accent text-bg w-11 grid place-items-center rounded-lg shrink-0">{{ icon('send','w-4 h-4') }}</button>
+    </div>
+  </div>
+</div>
+<script>
+const AV_PAL = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'];
+function _esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+function _initials(n){ const p=(n||'').trim().split(/\s+/); return (p[0]?.[0]||'')+(p[1]?.[0]||''); }
+const Bot = {
+  ready:false, suggestions:[],
+  async ensure(){
+    if(this.ready) return;
+    try{ const r=await fetch('/api/assistant/suggestions'); const d=await r.json(); this.suggestions=d.suggestions||[]; }catch(e){}
+    this.ready=true;
+    document.getElementById('chatChips').innerHTML=(this.suggestions).map(s=>
+      `<span class="chip" onclick="Bot.ask(this.dataset.q)" data-q="${_esc(s)}">${_esc(s)}</span>`).join('');
+    this.botSay({text:{{ t('assistant_greeting')|tojson }}, rows:[]});
+  },
+  async open(){
+    document.getElementById('botScrim').classList.remove('hidden');
+    requestAnimationFrame(()=>document.getElementById('botScrim').classList.add('show'));
+    document.getElementById('botDrawer').classList.add('show');
+    await this.ensure();
+    setTimeout(()=>document.getElementById('chatInput').focus(),120);
+  },
+  close(){
+    document.getElementById('botDrawer').classList.remove('show');
+    const s=document.getElementById('botScrim'); s.classList.remove('show');
+    setTimeout(()=>s.classList.add('hidden'),250);
+  },
+  meSay(t){ const b=document.getElementById('chatBody'); b.insertAdjacentHTML('beforeend',`<div class="bub me">${_esc(t)}</div>`); b.scrollTop=b.scrollHeight; },
+  botSay(r){
+    const b=document.getElementById('chatBody');
+    if(r.text) b.insertAdjacentHTML('beforeend',`<div class="bub bot">${_esc(r.text)}</div>`);
+    if(r.rows&&r.rows.length){
+      const rows=r.rows.map(m=>{
+        const col=AV_PAL[(m.id||0)%6];
+        const wa=m.wa?`<a href="${m.wa}" target="_blank" onclick="event.stopPropagation()" class="w-8 h-8 grid place-items-center rounded-lg text-white shrink-0" style="background:#25D366">${_waIcon()}</a>`:'';
+        return `<div class="botrow">
+          <span class="av" style="width:32px;height:32px;font-size:12px;background:${col}">${_esc(_initials(m.name))}</span>
+          <a href="/players/${m.id}" class="flex-1 min-w-0">
+            <div class="font-bold text-sm truncate">${_esc(m.name)}</div>
+            ${m.sub?`<div class="text-[11px] text-dim num truncate">${_esc(m.sub)}</div>`:''}
+          </a>${wa}</div>`;
+      }).join('');
+      b.insertAdjacentHTML('beforeend',`<div class="botrows">${rows}</div>`);
+    }
+    b.scrollTop=b.scrollHeight;
+  },
+  typing(){ const b=document.getElementById('chatBody'); b.insertAdjacentHTML('beforeend',`<div class="typing" id="botTyping"><i></i><i></i><i></i></div>`); b.scrollTop=b.scrollHeight; },
+  send(){ const i=document.getElementById('chatInput'); const q=i.value.trim(); if(!q)return; i.value=''; this.ask(q); },
+  async ask(q){
+    this.meSay(q); this.typing();
+    try{
+      const [r]=await Promise.all([ fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q})}).then(x=>x.json()), new Promise(r=>setTimeout(r,420)) ]);
+      document.getElementById('botTyping')?.remove(); this.botSay(r);
+    }catch(e){ document.getElementById('botTyping')?.remove(); this.botSay({text:{{ t('assistant_err')|tojson }},rows:[]}); }
+  }
+};
+function _waIcon(){ return '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>'; }
+</script>
 {% endif %}
 {% block scripts %}{% endblock %}
 </body>

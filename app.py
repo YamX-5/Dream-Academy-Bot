@@ -19,6 +19,7 @@ from flask import (Flask, abort, jsonify, redirect, render_template, request,
 
 import database as db
 import excel_io
+import assistant as ai
 from i18n import translate
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -719,6 +720,147 @@ def groups_delete(gid):
     con.commit()
     con.close()
     return redirect(url_for("settings_page"))
+
+
+# ---------------- assistant (fake AI) ----------------
+
+@app.route("/api/assistant/suggestions")
+@require_role("admin", "coach")
+def api_assistant_suggestions():
+    return jsonify({"suggestions": ai.SUGGESTIONS.get(current_lang(), ai.SUGGESTIONS["en"])})
+
+
+@app.route("/api/assistant", methods=["POST"])
+@require_role("admin", "coach")
+def api_assistant():
+    q = (request.get_json(force=True).get("q") or "").strip()
+    lang = current_lang()
+    con = db.get_db()
+    reply = ai.ask(con, q, lang)
+    st = db.get_settings()
+    # enrich rows with a ready WhatsApp link (renewal template)
+    for row in reply.get("rows", []):
+        phone = row.get("phone")
+        if phone:
+            msg = render_template_msg(st["template_renewal"], row["name"], row.get("left", ""), st["monthly_price"])
+            row["wa"] = wa_link(phone, msg)
+    con.close()
+    return jsonify(reply)
+
+
+# ---------------- analytics ----------------
+
+@app.route("/analytics")
+@require_role("admin")
+def analytics_page():
+    con = db.get_db()
+    st = db.get_settings()
+    today = date.today()
+    month = today.strftime("%Y-%m")
+    prev_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+
+    total_players = con.execute("SELECT COUNT(*) c FROM players WHERE status IN ('active','frozen')").fetchone()["c"]
+    active = con.execute("SELECT COUNT(*) c FROM players WHERE status='active'").fetchone()["c"]
+    rate = db.month_attendance_rate(con, month)
+    prev_rate = db.month_attendance_rate(con, prev_month)
+    rev = con.execute("SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?", (month + "%",)).fetchone()["s"]
+    prev_rev = con.execute("SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?", (prev_month + "%",)).fetchone()["s"]
+
+    # charts
+    att_rows = con.execute(
+        "SELECT session_date, SUM(status='present') p, SUM(status='absent') a FROM attendance "
+        "GROUP BY session_date ORDER BY session_date DESC LIMIT 12").fetchall()
+    att_chart = [{"d": r["session_date"][5:], "v": (round(r["p"]*100/(r["p"]+r["a"])) if (r["p"]+r["a"]) else 0)}
+                 for r in reversed(att_rows)]
+    rev_rows = con.execute(
+        "SELECT substr(date,1,7) m, SUM(amount) s FROM payments GROUP BY m ORDER BY m DESC LIMIT 6").fetchall()
+    rev_chart = [{"d": r["m"][2:], "v": r["s"]} for r in reversed(rev_rows)]
+    grp_rows = con.execute(
+        "SELECT COALESCE(g.name_ar, g.name_en) n, g.id gid FROM groups g").fetchall()
+    grp_chart = []
+    for g in grp_rows:
+        gr = con.execute(
+            "SELECT SUM(status='present') p, SUM(status='absent') a FROM attendance WHERE group_id=?",
+            (g["gid"],)).fetchone()
+        cnt = con.execute("SELECT COUNT(*) c FROM players WHERE group_id=? AND status='active'",
+                          (g["gid"],)).fetchone()["c"]
+        att = round(gr["p"]*100/(gr["p"]+gr["a"])) if (gr["p"] and (gr["p"]+gr["a"])) else 0
+        grp_chart.append({"d": g["n"], "players": cnt, "rate": att})
+
+    # new players per month (last 6)
+    new_rows = con.execute(
+        "SELECT substr(join_date,1,7) m, COUNT(*) c FROM players WHERE join_date!='' "
+        "GROUP BY m ORDER BY m DESC LIMIT 6").fetchall()
+    new_chart = [{"d": r["m"][2:], "v": r["c"]} for r in reversed(new_rows)]
+
+    # at-risk: active players whose attendance rate < 50% (min 3 sessions)
+    at_risk = []
+    for p in con.execute("SELECT * FROM players WHERE status='active'").fetchall():
+        s = db.attendance_rate(con, p["id"])
+        if s["rate"] is not None and s["total"] >= 3 and s["rate"] < 50:
+            at_risk.append({"id": p["id"], "name": p["full_name"], "rate": s["rate"]})
+    at_risk.sort(key=lambda x: x["rate"])
+
+    # best group by attendance
+    ranked = [g for g in grp_chart if g["players"] > 0]
+    best_group = max(ranked, key=lambda g: g["rate"]) if ranked else None
+
+    # ----- auto-generated "AI" insights -----
+    insights = []
+    if rate is not None and prev_rate is not None:
+        diff = rate - prev_rate
+        if diff >= 3:
+            insights.append({"tone": "ok", "text": ai_insight_att_up(current_lang(), diff, rate)})
+        elif diff <= -3:
+            insights.append({"tone": "bad", "text": ai_insight_att_down(current_lang(), abs(diff), rate)})
+    if best_group:
+        insights.append({"tone": "ok", "text": ai_insight_best_group(current_lang(), best_group)})
+    if at_risk:
+        insights.append({"tone": "warn", "text": ai_insight_at_risk(current_lang(), len(at_risk))})
+    if prev_rev and rev:
+        if rev >= prev_rev * 1.05:
+            insights.append({"tone": "ok", "text": ai_insight_rev(current_lang(), "up", rev, prev_rev)})
+        elif rev <= prev_rev * 0.95:
+            insights.append({"tone": "warn", "text": ai_insight_rev(current_lang(), "down", rev, prev_rev)})
+    if not insights:
+        insights.append({"tone": "muted", "text": (
+            "لسا ما في بيانات كافية لتحليل — سجّل حضور ودفعات أكثر." if current_lang() == "ar"
+            else "Not enough data yet — log more attendance and payments.")})
+
+    con.close()
+    return render_template("analytics.html",
+                           kpi={"total": total_players, "active": active, "rate": rate or 0, "revenue": rev},
+                           att_chart=att_chart, rev_chart=rev_chart, grp_chart=grp_chart,
+                           new_chart=new_chart, at_risk=at_risk[:6], insights=insights,
+                           best_group=best_group)
+
+
+def ai_insight_att_up(lang, diff, rate):
+    return (f"الحضور ارتفع {diff} نقطة عن الشهر الماضي ووصل {rate}٪ — استمر بنفس الروتين." if lang == "ar"
+            else f"Attendance is up {diff} points vs last month, now {rate}%. Keep the routine going.")
+
+
+def ai_insight_att_down(lang, diff, rate):
+    return (f"الحضور نزل {diff} نقطة لـ {rate}٪ — فكّر تبعث تذكير للأهالي." if lang == "ar"
+            else f"Attendance dropped {diff} points to {rate}%. Consider a reminder to parents.")
+
+
+def ai_insight_best_group(lang, g):
+    return (f"أعلى مجموعة حضوراً: {g['d']} بنسبة {g['rate']}٪." if lang == "ar"
+            else f"Top group by attendance: {g['d']} at {g['rate']}%.")
+
+
+def ai_insight_at_risk(lang, n):
+    return (f"{n} لاعب حضورهم أقل من 50٪ — معرّضين يتركوا، تابعهم." if lang == "ar"
+            else f"{n} players are below 50% attendance — at risk of dropping out. Follow up.")
+
+
+def ai_insight_rev(lang, dirn, rev, prev):
+    if dirn == "up":
+        return (f"الإيراد أعلى من الشهر الماضي ({rev:g} مقابل {prev:g} دينار)." if lang == "ar"
+                else f"Revenue is higher than last month ({rev:g} vs {prev:g} JD).")
+    return (f"الإيراد أقل من الشهر الماضي ({rev:g} مقابل {prev:g} دينار)." if lang == "ar"
+            else f"Revenue is lower than last month ({rev:g} vs {prev:g} JD).")
 
 
 # ---------------- excel ----------------
