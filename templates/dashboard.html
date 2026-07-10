@@ -2,20 +2,48 @@
 {% from "_icons.html" import icon %}
 {% block title %}{{ t('dash_title') }}{% endblock %}
 {% block content %}
-<h1 class="text-xl font-bold text-white mb-4">{{ t('dash_title') }}</h1>
+{% set pal = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
+{% macro avatar(name, id) %}{% set pp = name.split() %}<span class="av" style="background: {{ pal[id % 6] }}">{{ pp[0][0] }}{{ pp[1][0] if pp|length > 1 else '' }}</span>{% endmacro %}
 
-<div class="grid grid-cols-2 gap-2.5 mb-6">
+<!-- HERO -->
+<div class="gr-hero flex items-center gap-4 mb-4">
+  <div class="gr-pulse">{{ icon('clock' if alerts else 'chart','w-6 h-6') }}</div>
+  <div class="min-w-0 flex-1">
+    {% if alerts %}
+    <div class="text-2xl font-extrabold text-white leading-tight"><span class="num text-warn">{{ alerts|length }}</span> {{ 'لاعب' if lang=='ar' else 'players' }} {{ t('hero_need_renewal') }}</div>
+    <div class="text-xs text-dim mt-1">{{ t('hero_renewal_sub') }}</div>
+    {% elif kpis.attendance_rate is not none %}
+    <div class="text-2xl font-extrabold text-white leading-tight num text-ok">{{ kpis.attendance_rate }}%</div>
+    <div class="text-xs text-dim mt-1">{{ t('hero_att_sub') }}</div>
+    {% else %}
+    <div class="text-2xl font-extrabold text-white leading-tight">{{ t('hero_all_clear') }}</div>
+    <div class="text-xs text-dim mt-1">{{ t('hero_all_clear_sub') }}</div>
+    {% endif %}
+  </div>
+  <a href="/attendance" class="bg-accent text-bg font-bold px-4 py-2.5 rounded-lg text-sm shrink-0">{{ t('hero_cta') }}</a>
+</div>
+
+<!-- KPI ROW with sparklines -->
+{% set att_vals = att_chart|map(attribute='v')|list %}{% set att_max = att_vals|max if att_vals else 0 %}
+{% set rev_vals = rev_chart|map(attribute='v')|list %}{% set rev_max = rev_vals|max if rev_vals else 0 %}
+<div class="grid grid-cols-2 gap-2.5 mb-5">
   <div class="kpi bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_active') }}</div>
     <div class="text-2xl font-extrabold num text-white">{{ kpis.active_players }}</div>
   </div>
   <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_present') }}</div>
-    <div class="text-2xl font-extrabold num text-white">{{ kpis.present_today }}</div>
+    <div class="flex items-end justify-between">
+      <div class="text-2xl font-extrabold num text-white">{{ kpis.present_today }}</div>
+      {% if att_vals %}<div class="gr-spark">{% for v in att_vals %}<i style="height: {{ (2 + (v / att_max * 20)) | round | int if att_max else 2 }}px"></i>{% endfor %}</div>{% endif %}
+    </div>
   </div>
   <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_revenue') }}</div>
-    <div class="text-2xl font-extrabold num text-ok">{{ kpis.revenue_month }} <span class="text-sm font-semibold">JD</span></div>
+    <div class="flex items-end justify-between">
+      <div class="text-2xl font-extrabold num text-ok">{{ kpis.revenue_month }}<span class="text-sm font-semibold"> JD</span></div>
+      {% if rev_vals %}<div class="gr-spark">{% for v in rev_vals %}<i style="height: {{ (2 + (v / rev_max * 20)) | round | int if rev_max else 2 }}px"></i>{% endfor %}</div>{% endif %}
+    </div>
   </div>
   <div class="kpi {{ 'kpi-bad' if kpis.unpaid_count else '' }} bg-card rounded-xl p-4 border {{ 'border-bad/50' if kpis.unpaid_count else 'border-edge' }}">
     <div class="label-xs mb-1">{{ t('kpi_unpaid') }}</div>
@@ -23,78 +51,61 @@
   </div>
 </div>
 
-{% if pending %}
-<h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
-  <span class="text-amber-400">{{ icon('users','w-4 h-4') }}</span>{{ t('pending_approval') }}
-  <span class="text-xs bg-amber-500/20 text-amber-300 rounded-full px-2 py-0.5 num">{{ pending|length }}</span>
+<!-- RADAR -->
+<h2 class="flex items-center gap-2 font-bold mb-2.5 text-white">
+  <span class="text-accent">{{ icon('alert','w-4 h-4') }}</span>{{ t('radar_title') }}
 </h2>
-<div class="space-y-2 mb-6">
-  {% for p in pending %}
-  <div id="pending-{{ p.id }}" class="bg-card rounded-lg px-4 py-3 border border-amber-500/30">
-    <div class="flex items-center justify-between gap-2 mb-2">
-      <div class="min-w-0">
-        <div class="font-semibold truncate">{{ p.full_name }}</div>
-        <div class="text-xs text-dim">
-          {{ p.group_name or '—' }} · {{ t('added_by', who=(t('role_admin') if p.added_by=='admin' else t('role_coach'))) }}
-          {% if p.guardian_phone %} · <span dir="ltr" class="num">{{ p.guardian_phone }}</span>{% endif %}
-        </div>
+<div class="grid gap-3 sm:grid-cols-3 mb-6">
+  <!-- pending -->
+  <div class="gr-col violet">
+    <div class="hd"><span class="dot"></span><span class="t">{{ t('pending_approval') }}</span><span class="cnt num">{{ pending|length }}</span></div>
+    {% for p in pending %}
+    <div class="gr-row" id="pending-{{ p.id }}">
+      {{ avatar(p.full_name, p.id) }}
+      <a href="/players/{{ p.id }}/edit" class="flex-1 min-w-0">
+        <div class="font-bold text-sm truncate">{{ p.full_name }}</div>
+        <div class="text-[11px] text-dim truncate">{{ p.group_name or '—' }} · {{ t('added_by', who=(t('role_admin') if p.added_by=='admin' else t('role_coach'))) }}</div>
+      </a>
+      <div class="flex gap-1.5 shrink-0">
+        <button onclick="approvePlayer({{ p.id }})" title="{{ t('approve') }}" class="w-8 h-8 grid place-items-center rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition">{{ icon('check','w-4 h-4') }}</button>
+        <button onclick="rejectPlayer({{ p.id }})" title="{{ t('reject') }}" class="w-8 h-8 grid place-items-center rounded-lg bg-white/5 hover:bg-white/10 border border-edge text-bad transition">{{ icon('x','w-4 h-4') }}</button>
       </div>
     </div>
-    <div class="grid grid-cols-3 gap-2 text-sm">
-      <button onclick="approvePlayer({{ p.id }})"
-              class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition">
-        {{ icon('check','w-4 h-4') }}{{ t('approve') }}</button>
-      <a href="/players/{{ p.id }}/edit"
-         class="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-edge py-2 rounded-lg transition">
-        {{ icon('edit','w-3.5 h-3.5') }}{{ t('review') }}</a>
-      <button onclick="rejectPlayer({{ p.id }})"
-              class="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-edge text-red-400 py-2 rounded-lg transition">
-        {{ icon('x','w-4 h-4') }}{{ t('reject') }}</button>
-    </div>
+    {% else %}<div class="gr-empty">—</div>{% endfor %}
   </div>
-  {% endfor %}
-</div>
-{% endif %}
-
-{% if alerts %}
-<h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
-  <span class="text-yellow-400">{{ icon('clock','w-4 h-4') }}</span>{{ t('renewal_alerts') }}
-</h2>
-<div class="space-y-2 mb-6">
-  {% for a in alerts %}
-  <div class="bg-card rounded-lg px-4 py-3 border border-edge flex items-center justify-between gap-2">
-    <a href="/players/{{ a.player.id }}" class="min-w-0">
-      <div class="font-semibold truncate">{{ a.player.full_name }}</div>
-      <div class="text-xs text-dim num">
-        {% if a.active %}{{ t('alert_left_days', n=a.left, d=a.days_left) }}{% else %}<span class="text-red-400">{{ t('expired_needs_renewal') }}</span>{% endif %}
-        · {{ a.player.group_name or '—' }}
+  <!-- renewal -->
+  <div class="gr-col warn">
+    <div class="hd"><span class="dot"></span><span class="t">{{ t('renewal_alerts') }}</span><span class="cnt num">{{ alerts|length }}</span></div>
+    {% for a in alerts %}
+    <div class="gr-row">
+      {{ avatar(a.player.full_name, a.player.id) }}
+      <a href="/players/{{ a.player.id }}" class="flex-1 min-w-0">
+        <div class="font-bold text-sm truncate">{{ a.player.full_name }}</div>
+        <div class="text-[11px] num {{ 'text-warn' if a.active else 'text-bad' }} truncate">
+          {% if a.active %}{{ t('alert_left_days', n=a.left, d=a.days_left) }}{% else %}{{ t('expired_needs_renewal') }}{% endif %}</div>
+      </a>
+      {% if a.player.guardian_phone or a.player.phone %}
+      <a href="{{ a.wa }}" target="_blank" title="{{ t('whatsapp') }}" class="w-8 h-8 grid place-items-center rounded-lg text-white shrink-0 transition" style="background:#25D366">{{ icon('message','w-4 h-4') }}</a>
+      {% endif %}
+    </div>
+    {% else %}<div class="gr-empty">—</div>{% endfor %}
+  </div>
+  <!-- unpaid -->
+  <div class="gr-col bad">
+    <div class="hd"><span class="dot"></span><span class="t">{{ t('unpaid_title') }}</span><span class="cnt num">{{ unpaid|length }}</span></div>
+    {% for u in unpaid %}
+    <a href="/players/{{ u.pid }}" class="gr-row">
+      {{ avatar(u.full_name, u.pid) }}
+      <div class="flex-1 min-w-0">
+        <div class="font-bold text-sm truncate">{{ u.full_name }}</div>
+        <div class="text-[11px] text-dim num truncate">{{ t('attended_unpaid', d=u.session_date) }}</div>
       </div>
     </a>
-    {% if a.player.guardian_phone or a.player.phone %}
-    <a href="{{ a.wa }}" target="_blank"
-       class="shrink-0 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
-      {{ icon('message','w-3.5 h-3.5') }}{{ t('whatsapp') }}</a>
-    {% endif %}
+    {% else %}<div class="gr-empty">—</div>{% endfor %}
   </div>
-  {% endfor %}
 </div>
-{% endif %}
 
-{% if unpaid %}
-<h2 class="flex items-center gap-2 font-semibold mb-2 text-red-400">
-  {{ icon('alert','w-4 h-4') }}{{ t('unpaid_title') }}
-</h2>
-<div class="space-y-2 mb-6">
-  {% for u in unpaid %}
-  <a href="/players/{{ u.pid }}" class="block bg-card rounded-lg px-4 py-3 border border-red-500/40 hover:border-red-500/70 transition">
-    <div class="font-semibold">{{ u.full_name }}</div>
-    <div class="text-xs text-dim num">{{ t('attended_unpaid', d=u.session_date) }} · {{ u.group_name or '—' }}</div>
-  </a>
-  {% endfor %}
-</div>
-{% endif %}
-
-<h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
+<h2 class="flex items-center gap-2 font-bold mb-2.5 text-white">
   <span class="text-accent">{{ icon('chart','w-4 h-4') }}</span>{{ t('charts') }}
 </h2>
 <div class="space-y-3 mb-6">
@@ -149,9 +160,9 @@ const opts = { plugins:{legend:{display:false}}, scales:{
   y:{ticks:{color:'#8593A6',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}}};
 function mk(id,type,data,color){ new Chart(document.getElementById(id),{type,
   data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:color,borderColor:color,tension:.3,borderRadius:3}]},options:opts});}
-mk('attChart','line',{{ att_chart|tojson }},'#5B9BD5');
-mk('revChart','bar',{{ rev_chart|tojson }},'#34d399');
-mk('grpChart','bar',{{ grp_chart|tojson }},'#5B9BD5');
+mk('attChart','line',{{ att_chart|tojson }},'#8FCDF0');
+mk('revChart','bar',{{ rev_chart|tojson }},'#34C759');
+mk('grpChart','bar',{{ grp_chart|tojson }},'#8FCDF0');
 
 const CONFIRM_REJECT = {{ t('confirm_reject')|tojson }};
 async function approvePlayer(id) {
