@@ -7,7 +7,7 @@
 <div class="flex items-start gap-3 mb-4">
   <span class="av !w-12 !h-12 !text-lg" style="background: {{ avatar_palette[p.id % 6] }}">{{ parts[0][0] }}{{ parts[1][0] if parts|length > 1 else '' }}</span>
   <div class="flex-1 min-w-0">
-    <h1 class="text-xl font-bold text-white flex items-center gap-2 flex-wrap">{{ p.full_name }}
+    <h1 class="text-xl font-bold text-ink flex items-center gap-2 flex-wrap">{{ p.full_name }}
       {% if p.status=='pending' %}<span class="pill pill-warn">{{ t('pending_badge') }}</span>{% endif %}
       {% if p.status=='frozen' %}<span class="pill pill-sky">{{ t('st_frozen') }}</span>{% endif %}
       {% if p.status=='left' %}<span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}
@@ -19,26 +19,26 @@
     {% if p.guardian_name %}<div class="text-sm text-dim">{{ t('guardian_label') }}: {{ p.guardian_name }} — <span dir="ltr" class="num">{{ p.guardian_phone }}</span></div>{% endif %}
     {% if p.notes %}<div class="text-sm text-warn mt-1">{{ p.notes }}</div>{% endif %}
   </div>
-  <a href="/players/{{ p.id }}/edit" class="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-edge px-3 py-2 rounded-lg text-sm shrink-0 transition">
+  <a href="/players/{{ p.id }}/edit" class="flex items-center gap-1.5 bg-card2 hover:bg-card3 border border-edge px-3 py-2 rounded-lg text-sm shrink-0 transition">
     {{ icon('edit','w-3.5 h-3.5') }}{{ t('edit') }}</a>
 </div>
 
 <!-- subscription bar: the centerpiece -->
-<div class="bg-card rounded-xl p-5 border {{ 'border-accent/50' if info.active else 'border-red-500/50' }} mb-4">
+<div class="bg-card rounded-xl p-5 border {{ 'border-accent/50' if info.active else 'border-bad/50' }} mb-4">
   <div class="label-xs mb-2">{{ t('current_sub') }}</div>
   {% if info.active %}
     {% set used = info.sub.sessions_used %}{% set total = info.sub.sessions_total %}
     <div class="flex gap-1.5 mb-3" dir="ltr">
       {%- for i in range(total) %}
-      <span class="h-2 flex-1 rounded-full {{ 'bg-accent' if i < used else 'bg-white/10' }}"></span>
+      <span class="h-2 flex-1 rounded-full {{ 'bg-accent' if i < used else 'bg-card3' }}"></span>
       {% endfor -%}
     </div>
     <div class="font-semibold num">{{ t('sub_left_expires', n=info.left) }}
       <span class="text-dim font-normal text-sm">· {{ t('expires_on', d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7], days=info.days_left) }}</span>
     </div>
-    {% if info.needs_renewal %}<div class="flex items-center gap-1.5 text-yellow-300 text-sm mt-2">{{ icon('clock','w-4 h-4') }}{{ t('renew_soon') }}</div>{% endif %}
+    {% if info.needs_renewal %}<div class="flex items-center gap-1.5 text-warn text-sm mt-2">{{ icon('clock','w-4 h-4') }}{{ t('renew_soon') }}</div>{% endif %}
   {% else %}
-    <div class="flex items-center gap-2 font-semibold text-red-400">{{ icon('alert','w-4 h-4') }}{{ t('no_active_sub') }}</div>
+    <div class="flex items-center gap-2 font-semibold text-bad">{{ icon('alert','w-4 h-4') }}{{ t('no_active_sub') }}</div>
     {% if info.sub %}<div class="text-xs text-dim mt-1 num">{{ t('last_sub') }}: {{ info.sub.start_date }} ({{ t('sub_' ~ info.sub.status) }})</div>{% endif %}
   {% endif %}
 </div>
@@ -48,22 +48,22 @@
           class="flex items-center justify-center gap-1.5 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">
     {{ icon('renew','w-4 h-4') }}{{ t('renew') }}</button>
   {% if p.status == 'frozen' %}
-  <button onclick="act('unfreeze')" class="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-edge py-3 rounded-lg font-semibold transition">
+  <button onclick="act('unfreeze')" class="flex items-center justify-center gap-1.5 bg-card2 hover:bg-card3 border border-edge py-3 rounded-lg font-semibold transition">
     {{ icon('play','w-4 h-4') }}{{ t('unfreeze') }}</button>
   {% else %}
-  <button onclick="act('freeze')" class="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-edge py-3 rounded-lg font-semibold transition">
+  <button onclick="act('freeze')" class="flex items-center justify-center gap-1.5 bg-card2 hover:bg-card3 border border-edge py-3 rounded-lg font-semibold transition">
     {{ icon('pause','w-4 h-4') }}{{ t('freeze') }}</button>
   {% endif %}
   {% if p.guardian_phone or p.phone %}
   <a href="{{ wa }}" target="_blank" class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition">
     {{ icon('message','w-4 h-4') }}{{ t('whatsapp') }}</a>
   {% else %}
-  <div class="flex items-center justify-center bg-white/[0.02] border border-edge text-dim py-3 rounded-lg text-xs">{{ t('no_number') }}</div>
+  <div class="flex items-center justify-center bg-card2 border border-edge text-dim py-3 rounded-lg text-xs">{{ t('no_number') }}</div>
   {% endif %}
 </div>
 
 <h2 class="label-xs mb-2">{{ t('payments') }}</h2>
-<div class="bg-card rounded-lg border border-edge mb-5 divide-y divide-white/5">
+<div class="bg-card rounded-lg border border-edge mb-5 divide-y divide-edge2">
   {% for pay in pays %}
   <div class="px-4 py-2.5 flex justify-between items-center text-sm">
     <div><span class="font-semibold num">{{ pay.amount }} JD</span> <span class="text-dim">· {{ t(pay.method) if pay.method in ['cash','cliq','other'] else pay.method }}</span></div>
@@ -73,12 +73,12 @@
 </div>
 
 <h2 class="label-xs mb-2">{{ t('subscriptions') }}</h2>
-<div class="bg-card rounded-lg border border-edge mb-5 divide-y divide-white/5">
+<div class="bg-card rounded-lg border border-edge mb-5 divide-y divide-edge2">
   {% for s in subs %}
   <div class="px-4 py-2.5 flex justify-between text-sm">
     <div dir="ltr" class="num">{{ s.start_date }} → {{ s.expiry_date }}</div>
     <div class="text-dim num">{{ s.sessions_used }}/{{ s.sessions_total }} ·
-      <span class="{{ 'text-emerald-400' if s.status=='active' else 'text-dim' }}">{{ t('sub_' ~ s.status) }}</span>
+      <span class="{{ 'text-ok' if s.status=='active' else 'text-dim' }}">{{ t('sub_' ~ s.status) }}</span>
     </div>
   </div>
   {% else %}<div class="px-4 py-3 text-dim text-sm">{{ t('no_subs') }}</div>{% endfor %}
@@ -88,10 +88,10 @@
 <div class="bg-card rounded-lg border border-edge p-4 mb-5">
   {% if att_stats.rate is not none %}
   <div class="flex items-end justify-between mb-2">
-    <div class="text-3xl font-bold num {{ 'text-emerald-400' if att_stats.rate >= 75 else ('text-amber-400' if att_stats.rate >= 50 else 'text-red-400') }}">{{ att_stats.rate }}%</div>
-    {% if att_stats.streak >= 2 %}<div class="text-sm text-emerald-400 font-semibold">{{ t('att_streak', n=att_stats.streak) }}</div>{% endif %}
+    <div class="text-3xl font-bold num {{ 'text-ok' if att_stats.rate >= 75 else ('text-warn' if att_stats.rate >= 50 else 'text-bad') }}">{{ att_stats.rate }}%</div>
+    {% if att_stats.streak >= 2 %}<div class="text-sm text-ok font-semibold">{{ t('att_streak', n=att_stats.streak) }}</div>{% endif %}
   </div>
-  <div class="w-full h-2 rounded-full bg-white/10 overflow-hidden mb-2">
+  <div class="w-full h-2 rounded-full bg-card3 overflow-hidden mb-2">
     <div class="h-full {{ 'bg-emerald-500' if att_stats.rate >= 75 else ('bg-amber-500' if att_stats.rate >= 50 else 'bg-red-500') }}" style="width: {{ att_stats.rate }}%"></div>
   </div>
   <div class="text-xs text-dim num">{{ t('att_breakdown', p=att_stats.present, a=att_stats.absent, e=att_stats.excused) }}</div>
@@ -101,15 +101,15 @@
 </div>
 
 <h2 class="label-xs mb-2">{{ t('attendance_log') }}</h2>
-<div class="bg-card rounded-lg border border-edge divide-y divide-white/5 mb-6">
+<div class="bg-card rounded-lg border border-edge divide-y divide-edge2 mb-6">
   {% for a in att %}
   <div class="px-4 py-2.5 flex justify-between text-sm">
     <div class="num">{{ a.session_date }}</div>
     <div class="flex items-center gap-1.5
-      {{ 'text-emerald-400' if a.status=='present' else ('text-yellow-300' if a.status=='excused' else 'text-dim') }}">
+      {{ 'text-ok' if a.status=='present' else ('text-warn' if a.status=='excused' else 'text-dim') }}">
       {{ icon('check','w-3.5 h-3.5') if a.status=='present' else (icon('minus','w-3.5 h-3.5') if a.status=='excused' else icon('x','w-3.5 h-3.5')) }}
       {{ t('att_' ~ a.status) }}
-      {% if a.unpaid %}<span class="text-red-400 text-xs">· {{ t('unpaid_tag') }}</span>{% endif %}</div>
+      {% if a.unpaid %}<span class="text-bad text-xs">· {{ t('unpaid_tag') }}</span>{% endif %}</div>
   </div>
   {% else %}<div class="px-4 py-3 text-dim text-sm">{{ t('no_att') }}</div>{% endfor %}
 </div>
@@ -129,13 +129,13 @@
     </select>
     {% if prev_expiry %}
     <label class="flex items-center gap-2 text-sm mb-3 bg-bg rounded-lg px-3 py-3 border border-edge">
-      <input type="checkbox" id="rAfterExpiry" checked class="accent-[#5B9BD5]">
+      <input type="checkbox" id="rAfterExpiry" checked class="accent-accent">
       {{ t('start_after_expiry', d=prev_expiry) }}
     </label>
     {% endif %}
     <div class="flex gap-2">
       <button onclick="renew()" class="flex-1 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('confirm_received') }}</button>
-      <button onclick="document.getElementById('renewModal').classList.add('hidden')" class="px-4 bg-white/5 hover:bg-white/10 border border-edge rounded-lg transition">{{ t('cancel') }}</button>
+      <button onclick="document.getElementById('renewModal').classList.add('hidden')" class="px-4 bg-card2 hover:bg-card3 border border-edge rounded-lg transition">{{ t('cancel') }}</button>
     </div>
   </div>
 </div>

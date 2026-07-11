@@ -2,8 +2,8 @@
 {% from "_icons.html" import icon %}
 {% block title %}{{ t('settings_title') }}{% endblock %}
 {% block content %}
-<h1 class="text-xl font-bold text-white mb-4">{{ t('settings_title') }}</h1>
-{% if saved %}<div class="bg-emerald-500/15 border border-emerald-500/50 text-emerald-300 rounded-lg px-4 py-3 mb-4" role="status">{{ t('saved') }}</div>{% endif %}
+<h1 class="text-xl font-bold text-ink mb-4">{{ t('settings_title') }}</h1>
+{% if saved %}<div class="bg-ok/10 border border-emerald-500/50 text-ok rounded-lg px-4 py-3 mb-4" role="status">{{ t('saved') }}</div>{% endif %}
 
 {% if public_url %}
 <div class="bg-card rounded-lg p-4 border border-accent/40 mb-4 text-sm flex items-start gap-2">
@@ -23,7 +23,7 @@
       <input name="expiry_days" type="number" value="{{ st.expiry_days }}" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none"/></div>
   </div>
   <label class="flex items-center gap-2 bg-card rounded-lg px-4 py-3 border border-edge text-sm">
-    <input type="checkbox" name="deduct_on_absence" {% if st.deduct_on_absence %}checked{% endif %} class="accent-[#5B9BD5]">
+    <input type="checkbox" name="deduct_on_absence" {% if st.deduct_on_absence %}checked{% endif %} class="accent-accent">
     {{ t('deduct_absence') }}
   </label>
   <div>
@@ -31,7 +31,7 @@
     <div class="grid grid-cols-4 gap-1 mt-1 text-sm">
       {% for d in all_days %}
       <label class="flex items-center gap-1.5 bg-card rounded-lg px-2 py-2 border border-edge">
-        <input type="checkbox" name="training_days" value="{{ d }}" {% if d in st.training_days %}checked{% endif %} class="accent-[#5B9BD5]">{{ t('day_' ~ d) }}
+        <input type="checkbox" name="training_days" value="{{ d }}" {% if d in st.training_days %}checked{% endif %} class="accent-accent">{{ t('day_' ~ d) }}
       </label>
       {% endfor %}
     </div>
@@ -55,10 +55,10 @@
   <button class="w-full bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('save_settings') }}</button>
 </form>
 
-<h2 class="font-semibold mb-2 text-white">{{ t('groups_title') }}</h2>
+<h2 class="font-semibold mb-2 text-ink">{{ t('groups_title') }}</h2>
 <div class="space-y-2">
   {% for g in groups %}
-  <details class="bg-card rounded-lg border {{ 'border-red-500/50' if group_error == g.id else 'border-edge' }} group" {% if group_error == g.id %}open{% endif %}>
+  <details class="bg-card rounded-lg border {{ 'border-bad/50' if group_error == g.id else 'border-edge' }} group" {% if group_error == g.id %}open{% endif %}>
     <summary class="px-4 py-3 flex items-center justify-between cursor-pointer select-none list-none">
       <div class="min-w-0">
         <div class="font-semibold truncate">{{ g.name_ar }} <span class="text-dim font-normal">/ {{ g.name_en }}</span></div>
@@ -68,7 +68,7 @@
     </summary>
     <div class="px-4 pb-4 pt-1 border-t border-edge space-y-3">
       {% if group_error == g.id %}
-      <div class="text-red-400 text-xs bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{{ t('group_has_players', n=g.player_count) }}</div>
+      <div class="text-bad text-xs bg-bad/10 border border-bad/30 rounded-lg px-3 py-2">{{ t('group_has_players', n=g.player_count) }}</div>
       {% endif %}
       <form method="post" action="/groups/save" class="space-y-3">
         <input type="hidden" name="id" value="{{ g.id }}">
@@ -96,16 +96,16 @@
           <div><label class="label-xs">{{ t('time_slot') }}</label>
             <input name="time_slot" value="{{ g.time_slot }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="4:00–5:30"></div>
         </div>
-        <button class="w-full bg-white/5 hover:bg-white/10 border border-edge rounded-lg py-2.5 transition font-medium">{{ t('save_group') }}</button>
+        <button class="w-full bg-card2 hover:bg-card3 border border-edge rounded-lg py-2.5 transition font-medium">{{ t('save_group') }}</button>
       </form>
       <form method="post" action="/groups/{{ g.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_group')|tojson }})" class="text-center">
-        <button class="text-red-400 hover:text-red-300 text-xs font-medium transition">{{ t('delete_group') }}</button>
+        <button class="text-bad hover:text-bad text-xs font-medium transition">{{ t('delete_group') }}</button>
       </form>
     </div>
   </details>
   {% endfor %}
 
-  <details class="bg-card rounded-lg border border-dashed border-white/15">
+  <details class="bg-card rounded-lg border border-dashed border-edge">
     <summary class="px-4 py-3 flex items-center gap-2 cursor-pointer select-none list-none text-accent font-medium">
       <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
       {{ t('add_group') }}

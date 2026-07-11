@@ -891,7 +891,7 @@ def import_players():
     if not file:
         return redirect(url_for("players_page"))
     con = db.get_db()
-    imported, skipped, errors = excel_io.import_players(con, file, db.suggest_group)
+    imported, skipped, errors = excel_io.import_players(con, file, db.suggest_group, filename=file.filename)
     con.close()
     msg = translate(current_lang(), "import_msg", i=imported, s=skipped)
     if errors:

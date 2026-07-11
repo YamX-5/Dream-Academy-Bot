@@ -2,11 +2,11 @@
 {% block title %}QR — Dream Academy{% endblock %}
 {% block content %}
 <div class="text-center py-6">
-  <h1 class="text-xl font-bold text-white mb-2">{{ t('coach_access') }}</h1>
+  <h1 class="text-xl font-bold text-ink mb-2">{{ t('coach_access') }}</h1>
   {% if tunnel %}
   <p class="text-dim mb-6 text-sm">{{ t('tunnel_note')|safe }}</p>
   {% else %}
-  <p class="text-yellow-300 mb-6 text-sm">{{ t('no_tunnel_note') }}</p>
+  <p class="text-warn mb-6 text-sm">{{ t('no_tunnel_note') }}</p>
   {% endif %}
   <div class="inline-block bg-white p-4 rounded-xl mb-4">
     <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR code for coach access" class="w-64 h-64" width="256" height="256" />

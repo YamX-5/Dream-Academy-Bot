@@ -10,13 +10,13 @@
   <div class="gr-pulse">{{ icon('clock' if alerts else 'chart','w-6 h-6') }}</div>
   <div class="min-w-0 flex-1">
     {% if alerts %}
-    <div class="text-2xl font-extrabold text-white leading-tight"><span class="num text-warn">{{ alerts|length }}</span> {{ 'لاعب' if lang=='ar' else 'players' }} {{ t('hero_need_renewal') }}</div>
+    <div class="text-2xl font-extrabold text-ink leading-tight"><span class="num text-warn">{{ alerts|length }}</span> {{ 'لاعب' if lang=='ar' else 'players' }} {{ t('hero_need_renewal') }}</div>
     <div class="text-xs text-dim mt-1">{{ t('hero_renewal_sub') }}</div>
     {% elif kpis.attendance_rate is not none %}
-    <div class="text-2xl font-extrabold text-white leading-tight num text-ok">{{ kpis.attendance_rate }}%</div>
+    <div class="text-2xl font-extrabold text-ink leading-tight num text-ok">{{ kpis.attendance_rate }}%</div>
     <div class="text-xs text-dim mt-1">{{ t('hero_att_sub') }}</div>
     {% else %}
-    <div class="text-2xl font-extrabold text-white leading-tight">{{ t('hero_all_clear') }}</div>
+    <div class="text-2xl font-extrabold text-ink leading-tight">{{ t('hero_all_clear') }}</div>
     <div class="text-xs text-dim mt-1">{{ t('hero_all_clear_sub') }}</div>
     {% endif %}
   </div>
@@ -29,12 +29,12 @@
 <div class="grid grid-cols-2 gap-2.5 mb-5">
   <div class="kpi bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_active') }}</div>
-    <div class="text-2xl font-extrabold num text-white">{{ kpis.active_players }}</div>
+    <div class="text-2xl font-extrabold num text-ink">{{ kpis.active_players }}</div>
   </div>
   <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_present') }}</div>
     <div class="flex items-end justify-between">
-      <div class="text-2xl font-extrabold num text-white">{{ kpis.present_today }}</div>
+      <div class="text-2xl font-extrabold num text-ink">{{ kpis.present_today }}</div>
       {% if att_vals %}<div class="gr-spark">{% for v in att_vals %}<i style="height: {{ (2 + (v / att_max * 20)) | round | int if att_max else 2 }}px"></i>{% endfor %}</div>{% endif %}
     </div>
   </div>
@@ -47,12 +47,12 @@
   </div>
   <div class="kpi {{ 'kpi-bad' if kpis.unpaid_count else '' }} bg-card rounded-xl p-4 border {{ 'border-bad/50' if kpis.unpaid_count else 'border-edge' }}">
     <div class="label-xs mb-1">{{ t('kpi_unpaid') }}</div>
-    <div class="text-2xl font-extrabold num {{ 'text-bad' if kpis.unpaid_count else 'text-white' }}">{{ kpis.unpaid_count }}</div>
+    <div class="text-2xl font-extrabold num {{ 'text-bad' if kpis.unpaid_count else 'text-ink' }}">{{ kpis.unpaid_count }}</div>
   </div>
 </div>
 
 <!-- RADAR -->
-<h2 class="flex items-center gap-2 font-bold mb-2.5 text-white">
+<h2 class="flex items-center gap-2 font-bold mb-2.5 text-ink">
   <span class="text-accent">{{ icon('alert','w-4 h-4') }}</span>{{ t('radar_title') }}
 </h2>
 <div class="grid gap-3 sm:grid-cols-3 mb-6">
@@ -68,7 +68,7 @@
       </a>
       <div class="flex gap-1.5 shrink-0">
         <button onclick="approvePlayer({{ p.id }})" title="{{ t('approve') }}" class="w-8 h-8 grid place-items-center rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition">{{ icon('check','w-4 h-4') }}</button>
-        <button onclick="rejectPlayer({{ p.id }})" title="{{ t('reject') }}" class="w-8 h-8 grid place-items-center rounded-lg bg-white/5 hover:bg-white/10 border border-edge text-bad transition">{{ icon('x','w-4 h-4') }}</button>
+        <button onclick="rejectPlayer({{ p.id }})" title="{{ t('reject') }}" class="w-8 h-8 grid place-items-center rounded-lg bg-card2 hover:bg-card3 border border-edge text-bad transition">{{ icon('x','w-4 h-4') }}</button>
       </div>
     </div>
     {% else %}<div class="gr-empty">—</div>{% endfor %}
@@ -105,7 +105,7 @@
   </div>
 </div>
 
-<h2 class="flex items-center gap-2 font-bold mb-2.5 text-white">
+<h2 class="flex items-center gap-2 font-bold mb-2.5 text-ink">
   <span class="text-accent">{{ icon('chart','w-4 h-4') }}</span>{{ t('charts') }}
 </h2>
 <div class="space-y-3 mb-6">
@@ -113,7 +113,7 @@
     <div class="flex items-center justify-between mb-2">
       <div class="label-xs">{{ t('chart_att') }}</div>
       {% if kpis.attendance_rate is not none %}
-      <div class="text-sm font-semibold num {{ 'text-emerald-400' if kpis.attendance_rate >= 75 else ('text-amber-400' if kpis.attendance_rate >= 50 else 'text-red-400') }}">
+      <div class="text-sm font-semibold num {{ 'text-ok' if kpis.attendance_rate >= 75 else ('text-warn' if kpis.attendance_rate >= 50 else 'text-bad') }}">
         {{ kpis.attendance_rate }}% <span class="text-dim font-normal text-xs">{{ t('kpi_att_rate') }}</span>
       </div>
       {% endif %}
@@ -131,10 +131,10 @@
 </div>
 
 {% if bdays %}
-<h2 class="flex items-center gap-2 font-semibold mb-2 text-white">
+<h2 class="flex items-center gap-2 font-semibold mb-2 text-ink">
   <span class="text-accent">{{ icon('gift','w-4 h-4') }}</span>{{ t('birthdays') }}
 </h2>
-<div class="bg-card rounded-lg px-4 py-2 border border-edge mb-6 divide-y divide-white/5">
+<div class="bg-card rounded-lg px-4 py-2 border border-edge mb-6 divide-y divide-edge2">
   {% for b in bdays %}
   <div class="flex justify-between items-center py-2">
     <a href="/players/{{ b.id }}" class="font-medium hover:text-accent transition">{{ b.full_name }}</a>
@@ -147,7 +147,7 @@
 <div class="flex flex-wrap gap-2">
   <a href="/export/all" class="flex items-center gap-2 bg-accent hover:bg-accent2 text-bg font-semibold px-4 py-2.5 rounded-lg text-sm transition">
     {{ icon('download','w-4 h-4') }}{{ t('export_all') }}</a>
-  <a href="/settings" class="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-edge px-4 py-2.5 rounded-lg text-sm transition">
+  <a href="/settings" class="flex items-center gap-2 bg-card2 hover:bg-card3 border border-edge px-4 py-2.5 rounded-lg text-sm transition">
     {{ icon('settings','w-4 h-4') }}{{ t('settings') }}</a>
 </div>
 {% endblock %}
@@ -155,14 +155,17 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
+const _c = getComputedStyle(document.documentElement);
+const AXIS = 'rgb(' + _c.getPropertyValue('--dim').trim() + ')';
+const GRID = 'rgb(' + _c.getPropertyValue('--edge').trim() + ' / .5)';
 const opts = { plugins:{legend:{display:false}}, scales:{
-  x:{ticks:{color:'#8593A6',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
-  y:{ticks:{color:'#8593A6',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true}}};
+  x:{ticks:{color:AXIS,font:{size:10}},grid:{display:false}},
+  y:{ticks:{color:AXIS,font:{size:10}},grid:{color:GRID},beginAtZero:true}}};
 function mk(id,type,data,color){ new Chart(document.getElementById(id),{type,
-  data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:color,borderColor:color,tension:.3,borderRadius:3}]},options:opts});}
-mk('attChart','line',{{ att_chart|tojson }},'#8FCDF0');
-mk('revChart','bar',{{ rev_chart|tojson }},'#34C759');
-mk('grpChart','bar',{{ grp_chart|tojson }},'#8FCDF0');
+  data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:color,borderColor:color,tension:.35,borderRadius:6,maxBarThickness:38,categoryPercentage:.6,barPercentage:.7,pointRadius:type==='line'?3:0,borderWidth:type==='line'?2.5:0}]},options:opts});}
+mk('attChart','line',{{ att_chart|tojson }},'#5FB0DE');
+mk('revChart','bar',{{ rev_chart|tojson }},'#1A9B4F');
+mk('grpChart','bar',{{ grp_chart|tojson }},'#5FB0DE');
 
 const CONFIRM_REJECT = {{ t('confirm_reject')|tojson }};
 async function approvePlayer(id) {

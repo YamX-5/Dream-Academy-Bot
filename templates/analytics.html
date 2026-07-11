@@ -3,7 +3,7 @@
 {% block title %}{{ t('analytics_title') }}{% endblock %}
 {% block content %}
 {% set pal = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
-<h1 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+<h1 class="text-xl font-bold text-ink mb-4 flex items-center gap-2">
   <span class="text-accent">{{ icon('analytics','w-5 h-5') }}</span>{{ t('analytics_title') }}
 </h1>
 
@@ -11,11 +11,11 @@
 <div class="grid grid-cols-2 gap-2.5 mb-5">
   <div class="kpi bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('an_total') }}</div>
-    <div class="text-2xl font-extrabold num text-white">{{ kpi.total }}</div>
+    <div class="text-2xl font-extrabold num text-ink">{{ kpi.total }}</div>
   </div>
   <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('an_active') }}</div>
-    <div class="text-2xl font-extrabold num text-white">{{ kpi.active }}</div>
+    <div class="text-2xl font-extrabold num text-ink">{{ kpi.active }}</div>
   </div>
   <div class="kpi {{ 'kpi-ok' if kpi.rate >= 75 else ('kpi-warn' if kpi.rate >= 50 else 'kpi-bad') }} bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-1">{{ t('an_rate') }}</div>
@@ -28,7 +28,7 @@
 </div>
 
 <!-- AI insights -->
-<h2 class="flex items-center gap-2 font-bold mb-2.5 text-white">
+<h2 class="flex items-center gap-2 font-bold mb-2.5 text-ink">
   <span class="text-accent">{{ icon('sparkle','w-4 h-4') }}</span>{{ t('an_ai_insights') }}
 </h2>
 <div class="space-y-2 mb-6">
@@ -45,7 +45,7 @@
 
 <!-- at-risk -->
 {% if at_risk %}
-<h2 class="flex items-center gap-2 font-bold mb-1 text-white">
+<h2 class="flex items-center gap-2 font-bold mb-1 text-ink">
   <span class="text-bad">{{ icon('alert','w-4 h-4') }}</span>{{ t('an_at_risk') }}
 </h2>
 <div class="text-xs text-dim mb-2.5">{{ t('an_at_risk_sub') }}</div>
@@ -77,7 +77,7 @@
     {% for g in grp_chart %}
     <div class="flex items-center gap-3 mb-2.5">
       <div class="w-20 text-xs text-dim truncate shrink-0">{{ g.d }}</div>
-      <div class="flex-1 h-3 rounded-full bg-white/10 overflow-hidden">
+      <div class="flex-1 h-3 rounded-full bg-card3 overflow-hidden">
         <div class="h-full rounded-full" style="width: {{ g.rate }}%; background:linear-gradient(90deg,var(--acc),var(--acc2))"></div>
       </div>
       <div class="w-14 text-end text-xs num {{ 'text-dim' if g.players == 0 }}">{{ g.rate }}%</div>
@@ -94,13 +94,20 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-const opts = (max) => ({ plugins:{legend:{display:false}}, scales:{
-  x:{ticks:{color:'#8B95A7',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
-  y:{ticks:{color:'#8B95A7',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true,max:max}}});
-function mk(id,type,data,color,max){ new Chart(document.getElementById(id),{type,
-  data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:color,borderColor:color,tension:.3,borderRadius:4,fill:false}]},options:opts(max)});}
-mk('rateChart','line',{{ att_chart|tojson }},'#8FCDF0',100);
-mk('revChart','bar',{{ rev_chart|tojson }},'#34C759');
-mk('newChart','bar',{{ new_chart|tojson }},'#8FCDF0');
+const css = getComputedStyle(document.documentElement);
+const AXIS = 'rgb(' + css.getPropertyValue('--dim').trim() + ')';
+const GRID = 'rgb(' + css.getPropertyValue('--edge').trim() + ' / .5)';
+const opts = (max) => ({ plugins:{legend:{display:false},tooltip:{enabled:true}}, scales:{
+  x:{ticks:{color:AXIS,font:{size:10}},grid:{display:false}},
+  y:{ticks:{color:AXIS,font:{size:10}},grid:{color:GRID},beginAtZero:true,max:max}}});
+function mk(id,type,data,color,max){
+  new Chart(document.getElementById(id),{type,
+    data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:color,borderColor:color,
+      tension:.35,borderRadius:6,fill:false,maxBarThickness:38,categoryPercentage:.6,barPercentage:.7,
+      pointRadius:type==='line'?3:0,pointBackgroundColor:color,borderWidth:type==='line'?2.5:0}]},
+    options:opts(max)});}
+mk('rateChart','line',{{ att_chart|tojson }},'#5FB0DE',100);
+mk('revChart','bar',{{ rev_chart|tojson }},'#1A9B4F');
+mk('newChart','bar',{{ new_chart|tojson }},'#5FB0DE');
 </script>
 {% endblock %}

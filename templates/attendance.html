@@ -3,12 +3,36 @@
 {% block title %}{{ t('nav_attendance') }}{% endblock %}
 {% block content %}
 
-<!-- group picker -->
-<select id="group" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mb-2 text-base focus:border-accent outline-none transition">
-  <option value="">{{ t('choose_group') }}</option>
-  {% for g in groups %}
-  <option value="{{ g.id }}">{{ g.name_ar if lang == 'ar' else g.name_en }} · {{ g.time_slot }}</option>
-  {% endfor %}
+{% if role == 'coach' %}
+<div class="gr-hero flex items-center gap-3 mb-4">
+  <div class="gr-pulse">{{ icon('whistle','w-6 h-6') }}</div>
+  <div class="min-w-0">
+    <div class="font-extrabold text-lg text-ink leading-tight">{{ t('coach_hi') }}</div>
+    <div class="text-xs text-dim">{{ t('coach_pick_group') }}</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- group picker (chips) -->
+<div class="mb-3">
+  <div class="label-xs mb-1.5">{{ t('group') }}</div>
+  {% if groups %}
+  <div class="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1" style="scrollbar-width:none">
+    {% for g in groups %}
+    <button type="button" class="gchip shrink-0 text-start" data-gid="{{ g.id }}" onclick="selectGroup({{ g.id }}, this)">
+      <div class="whitespace-nowrap">{{ g.name_ar if lang == 'ar' else g.name_en }}</div>
+      {% if g.time_slot %}<div class="sub num whitespace-nowrap">{{ g.time_slot }}</div>{% endif %}
+    </button>
+    {% endfor %}
+  </div>
+  {% else %}
+  <a href="/settings" class="block bg-card border border-dashed border-edge rounded-xl px-4 py-4 text-center text-dim text-sm">
+    {{ t('no_groups_yet') }}
+  </a>
+  {% endif %}
+</div>
+<select id="group" class="sr-only" aria-hidden="true" tabindex="-1">
+  <option value=""></option>{% for g in groups %}<option value="{{ g.id }}">{{ g.id }}</option>{% endfor %}
 </select>
 
 <!-- date bar: auto-today, step with arrows, tap centre to jump -->
@@ -31,11 +55,11 @@
 <div id="statsBar" class="hidden mb-3">
   <div class="grid grid-cols-3 gap-2 mb-2">
     <div class="bg-card border border-edge rounded-lg py-2 text-center">
-      <div class="text-xl font-bold num text-emerald-400" id="pcount">0</div>
+      <div class="text-xl font-bold num text-ok" id="pcount">0</div>
       <div class="label-xs">{{ t('present_word') }}</div>
     </div>
     <div class="bg-card border border-edge rounded-lg py-2 text-center">
-      <div class="text-xl font-bold num text-red-400" id="acount">0</div>
+      <div class="text-xl font-bold num text-bad" id="acount">0</div>
       <div class="label-xs">{{ t('absent_word') }}</div>
     </div>
     <div class="bg-card border border-edge rounded-lg py-2 text-center">
@@ -69,9 +93,9 @@
     <div class="flex gap-2">
       <button onclick="copySummary()" class="flex-1 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('copy_whatsapp') }}</button>
       <button onclick="document.getElementById('modal').classList.add('hidden')"
-              class="px-4 bg-white/5 hover:bg-white/10 border border-edge rounded-lg transition">{{ t('close') }}</button>
+              class="px-4 bg-card2 hover:bg-card3 border border-edge rounded-lg transition">{{ t('close') }}</button>
     </div>
-    <div id="copied" class="hidden text-emerald-400 text-sm text-center mt-2" role="status">{{ t('copied_note') }}</div>
+    <div id="copied" class="hidden text-ok text-sm text-center mt-2" role="status">{{ t('copied_note') }}</div>
   </div>
 </div>
 
@@ -86,10 +110,10 @@
     <label class="label-xs" for="npPhone">{{ t('guardian_wa_opt') }}</label>
     <input id="npPhone" type="tel" inputmode="tel" placeholder="07XXXXXXXX"
            class="w-full bg-bg border border-edge rounded-lg px-3 py-3 mt-1 mb-4 num focus:border-accent outline-none" />
-    <div id="npError" class="hidden text-red-400 text-sm mb-3" role="alert"></div>
+    <div id="npError" class="hidden text-bad text-sm mb-3" role="alert"></div>
     <div class="flex gap-2">
       <button id="npSubmit" onclick="submitAdd()" class="flex-1 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('add') }}</button>
-      <button onclick="document.getElementById('addModal').classList.add('hidden')" class="px-4 bg-white/5 hover:bg-white/10 border border-edge rounded-lg transition">{{ t('cancel') }}</button>
+      <button onclick="document.getElementById('addModal').classList.add('hidden')" class="px-4 bg-card2 hover:bg-card3 border border-edge rounded-lg transition">{{ t('cancel') }}</button>
     </div>
   </div>
 </div>
@@ -137,10 +161,10 @@ let curDate = TODAY;
 
 // high-contrast card states (readable on a court in daylight)
 const STYLES = {
-  present: 'bg-emerald-500 border-emerald-500 text-white',
-  absent:  'bg-red-500/90 border-red-500 text-white',
+  present: 'bg-emerald-500 border-emerald-500 text-ink',
+  absent:  'bg-red-500/90 border-red-500 text-ink',
   excused: 'bg-amber-400 border-amber-400 text-black',
-  none:    'bg-card border-edge text-white'
+  none:    'bg-card border-edge text-ink'
 };
 const NEXT = { none:'present', present:'absent', absent:'none', excused:'none' };
 
@@ -164,7 +188,7 @@ function refreshDateUI() {
   const isTraining = TRAINING_DAYS.includes(wdEn);
   document.getElementById('dateSub').textContent = isTraining ? wd : `${wd} · ${I18N.notTraining}`;
   document.getElementById('dateSub').className =
-    'text-[11px] leading-tight ' + (isTraining ? 'text-dim' : 'text-amber-400');
+    'text-[11px] leading-tight ' + (isTraining ? 'text-dim' : 'text-warn');
   document.getElementById('todayBtn').classList.toggle('hidden', curDate === TODAY);
   dateInp.value = curDate;
 }
@@ -192,11 +216,11 @@ function render() {
   players.forEach(p => {
     const card = document.createElement('button');
     card.className = `relative rounded-lg border-2 px-2 py-4 text-center font-semibold leading-tight
-      transition select-none min-h-[80px] ${STYLES[p.status]} ${!p.paid ? 'ring-2 ring-red-500/80' : ''}`;
+      transition select-none min-h-[80px] ${STYLES[p.status]} ${!p.paid ? 'ring-2 ring-bad/80' : ''}`;
     card.innerHTML = `
       <div class="text-[15px]">${p.name}</div>
-      <div class="mt-1 text-xs font-normal num ${p.status==='none' && p.left <= 2 ? 'text-red-400 font-semibold' : 'opacity-80'}">
-        ${p.paid ? I18N.left.replace('{n}', p.left) : `<span class="${p.status==='none'?'text-red-400':''}">${I18N.noSub}</span>`}
+      <div class="mt-1 text-xs font-normal num ${p.status==='none' && p.left <= 2 ? 'text-bad font-semibold' : 'opacity-80'}">
+        ${p.paid ? I18N.left.replace('{n}', p.left) : `<span class="${p.status==='none'?'text-bad':''}">${I18N.noSub}</span>`}
       </div>
       ${p.frozen ? `<div class="text-[10px] uppercase tracking-wide mt-0.5 opacity-80">${I18N.frozen}</div>` : ''}
       ${p.pending ? `<span class="absolute top-1.5 ${rtl?'right-1.5':'left-1.5'} text-[9px] uppercase tracking-wide bg-amber-500/30 text-amber-100 rounded px-1 py-0.5">${I18N.newBadge}</span>` : ''}
@@ -300,6 +324,11 @@ document.getElementById('prevDay').addEventListener('click', () => { curDate = i
 document.getElementById('nextDay').addEventListener('click', () => { curDate = isoShift(curDate, 1); refreshDateUI(); load(); });
 document.getElementById('todayBtn').addEventListener('click', () => { curDate = TODAY; refreshDateUI(); load(); });
 dateInp.addEventListener('change', () => { if (dateInp.value) { curDate = dateInp.value; refreshDateUI(); load(); } });
+function selectGroup(gid, el){
+  groupSel.value = gid;
+  document.querySelectorAll('.gchip').forEach(c => c.classList.toggle('on', c === el));
+  load();
+}
 groupSel.addEventListener('change', load);
 
 refreshDateUI();

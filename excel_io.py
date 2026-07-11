@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Excel export/import for Dream Academy Manager (openpyxl, Arabic-safe)."""
+import csv
 import io
 import os
 from datetime import date, datetime
@@ -115,30 +116,100 @@ def players_template():
     return buf.read()
 
 
-def import_players(con, file_stream, suggest_group_fn):
-    """Bulk-load players from a template xlsx. Returns (imported, skipped, errors)."""
+def _norm_cell(v):
+    return str(v).strip() if v is not None else ""
+
+
+def _rows_from_xlsx(file_stream):
     wb = load_workbook(file_stream)
     ws = wb.active
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if row and any(c is not None and str(c).strip() for c in row):
+            yield [_norm_cell(c) for c in row]
+
+
+def _rows_from_delimited(file_stream, delimiter):
+    raw = file_stream.read()
+    if isinstance(raw, bytes):
+        # handle a UTF-8 BOM from Excel-exported CSVs
+        raw = raw.decode("utf-8-sig", errors="replace")
+    lines = [ln for ln in raw.splitlines() if ln.strip()]
+    if not lines:
+        return
+    reader = csv.reader(lines, delimiter=delimiter)
+    rows = list(reader)
+    # drop a header row if the first cell looks like a header label
+    head = (rows[0][0] if rows and rows[0] else "").strip().lower()
+    if head in ("name", "full name", "full_name", "الاسم", "الاسم الكامل", "الاسم الكامل*"):
+        rows = rows[1:]
+    for r in rows:
+        if r and r[0].strip():
+            yield [c.strip() for c in r]
+
+
+def _rows_from_txt(file_stream):
+    raw = file_stream.read()
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8-sig", errors="replace")
+    for ln in raw.splitlines():
+        name = ln.strip()
+        if name:
+            yield [name]
+
+
+def import_players(con, file_storage, suggest_group_fn, filename=None):
+    """Bulk-load players from .xlsx / .csv / .tsv / .txt.
+
+    Column order (when present): name, birth_date, gender, phone, guardian_name,
+    guardian_phone, group, notes. TXT and single-column files import names only.
+    Returns (imported, skipped, errors).
+    """
+    filename = (filename or getattr(file_storage, "filename", "") or "").lower()
+    stream = getattr(file_storage, "stream", file_storage)
+
+    # sniff the leading bytes so a raw BytesIO (no filename) is still detected
+    magic = b""
+    try:
+        pos = stream.tell()
+        head = stream.read(4)
+        stream.seek(pos)
+        magic = head if isinstance(head, bytes) else head.encode("utf-8", "replace")
+    except Exception:
+        pass
+    is_xlsx = filename.endswith(".xlsx") or magic[:2] == b"PK"
+
+    if is_xlsx:
+        row_iter = _rows_from_xlsx(stream)
+    elif filename.endswith(".tsv"):
+        row_iter = _rows_from_delimited(stream, "\t")
+    elif filename.endswith(".txt"):
+        row_iter = _rows_from_txt(stream)
+    else:
+        # csv (default for anything text-like, incl. unknown/no extension)
+        row_iter = _rows_from_delimited(stream, ",")
+
     imported, skipped, errors = 0, 0, []
-    groups = {r["name_ar"].strip(): r["id"] for r in con.execute("SELECT id, name_ar FROM groups").fetchall()}
-    for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        if not row or not row[0]:
-            continue
-        name = str(row[0]).strip()
-        if "احذف هذا الصف" in (str(row[7] or "")):
+    groups = {}
+    for r in con.execute("SELECT id, name_ar, name_en FROM groups").fetchall():
+        groups[(r["name_ar"] or "").strip()] = r["id"]
+        groups[(r["name_en"] or "").strip().lower()] = r["id"]
+
+    for i, row in enumerate(row_iter, start=2):
+        name = (row[0] if row else "").strip()
+        if not name or "احذف هذا الصف" in (row[7] if len(row) > 7 else ""):
             continue
         try:
-            birth = str(row[1]).strip()[:10] if row[1] else ""
-            gender = (str(row[2]).strip().upper() or "M") if row[2] else "M"
-            gender = "F" if gender.startswith("F") or gender == "أنثى" else "M"
-            phone = str(row[3] or "").strip()
-            gname = str(row[4] or "").strip()
-            gphone = str(row[5] or "").strip()
-            grp_name = str(row[6] or "").strip()
-            notes = str(row[7] or "").strip()
-            group_id = groups.get(grp_name) or suggest_group_fn(con, birth, gender)
-            dup = con.execute("SELECT id FROM players WHERE full_name=?", (name,)).fetchone()
-            if dup:
+            g = lambda idx: (row[idx].strip() if len(row) > idx and row[idx] else "")
+            birth = g(1)[:10]
+            gd = g(2).upper()
+            gender = "F" if gd.startswith("F") or "أنثى" in gd or gd == "F" else "M"
+            phone = g(3)
+            gname = g(4)
+            gphone = g(5)
+            grp_name = g(6)
+            notes = g(7)
+            group_id = groups.get(grp_name) or groups.get(grp_name.lower()) or suggest_group_fn(con, birth, gender)
+            if con.execute("SELECT id FROM players WHERE full_name=?", (name,)).fetchone():
                 skipped += 1
                 continue
             con.execute(
@@ -148,7 +219,7 @@ def import_players(con, file_stream, suggest_group_fn):
             )
             imported += 1
         except Exception as e:
-            errors.append(f"صف {i}: {e}")
+            errors.append(f"row {i}: {e}")
     con.commit()
     return imported, skipped, errors
 

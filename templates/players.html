@@ -3,7 +3,7 @@
 {% block title %}{{ t('players_title') }}{% endblock %}
 {% block content %}
 <div class="flex items-center justify-between mb-4">
-  <h1 class="text-xl font-bold text-white">{{ t('players_title') }}</h1>
+  <h1 class="text-xl font-bold text-ink">{{ t('players_title') }}</h1>
   <a href="/players/new" class="flex items-center gap-1.5 bg-accent hover:bg-accent2 text-bg font-semibold px-3.5 py-2 rounded-lg text-sm transition">
     {{ icon('plus','w-4 h-4') }}{{ t('new_player') }}</a>
 </div>
@@ -32,10 +32,10 @@
       <option value="left" {% if f_status=='left' %}selected{% endif %}>{{ t('st_left') }}</option>
     </select>
     <label class="flex items-center gap-2 bg-card border border-edge rounded-lg px-3 py-2">
-      <input type="checkbox" name="renewal" value="1" {% if f_renewal %}checked{% endif %} class="accent-[#5B9BD5]"> {{ t('needs_renewal') }}
+      <input type="checkbox" name="renewal" value="1" {% if f_renewal %}checked{% endif %} class="accent-accent"> {{ t('needs_renewal') }}
     </label>
   </div>
-  <button class="bg-white/5 hover:bg-white/10 border border-edge px-4 py-2 rounded-lg text-sm transition">{{ t('apply_filter') }}</button>
+  <button class="bg-card2 hover:bg-card3 border border-edge px-4 py-2 rounded-lg text-sm transition">{{ t('apply_filter') }}</button>
 </form>
 
 {% set avatar_palette = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
@@ -68,9 +68,10 @@
 
 <div class="mt-6 bg-card rounded-lg p-4 border border-edge">
   <div class="flex items-center gap-2 font-semibold mb-2">{{ icon('upload','w-4 h-4') }}{{ t('import_title') }}</div>
-  <div class="text-xs text-dim mb-3">{{ t('import_hint_pre') }} <a href="/import/template" class="text-accent underline">{{ t('import_hint_link') }}</a>{{ t('import_hint_post') }}</div>
+  <div class="text-xs text-dim mb-1">{{ t('import_hint_pre') }} <a href="/import/template" class="text-accent underline">{{ t('import_hint_link') }}</a>{{ t('import_hint_post') }}</div>
+  <div class="text-[11px] text-faint mb-3">{{ t('import_formats') }}</div>
   <form method="post" action="/import/players" enctype="multipart/form-data" class="flex gap-2">
-    <input type="file" name="file" accept=".xlsx" required class="text-sm flex-1 text-dim" />
+    <input type="file" name="file" accept=".xlsx,.csv,.tsv,.txt" required class="text-sm flex-1 text-dim" />
     <button class="bg-accent hover:bg-accent2 text-bg font-semibold px-4 py-2 rounded-lg text-sm transition">{{ t('import_btn') }}</button>
   </form>
 </div>
