@@ -37,6 +37,22 @@ app = Flask(__name__)
 app.secret_key = "dream-academy-local-secret-key-2026"
 app.json.ensure_ascii = False
 
+# bump this string whenever the UI changes so you can confirm a fresh load
+BUILD = "v8 · 2026-07-11"
+
+
+@app.after_request
+def _no_cache(resp):
+    """Never let the browser serve a stale page — this is why UI changes
+    sometimes 'don't show up' after a deploy."""
+    ct = resp.headers.get("Content-Type", "")
+    if ct.startswith("text/html"):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+    return resp
+
+
 PUBLIC_URL = {"url": None}  # filled by the cloudflared thread
 _last_backup_check = {"date": None}
 
@@ -140,6 +156,7 @@ def inject_globals():
         "dir": "rtl" if lang == "ar" else "ltr",
         "t": lambda key, **kw: translate(lang, key, **kw),
         "wa_num": jordan_wa_number,
+        "BUILD": BUILD,
     }
 
 

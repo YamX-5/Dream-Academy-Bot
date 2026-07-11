@@ -165,7 +165,7 @@ tailwind.config = { theme: { extend: {
     <span class="brand-logo w-9 h-9 rounded-xl grid place-items-center font-extrabold text-sm">DA</span>
     <span class="leading-tight">
       <span class="block font-bold text-ink text-sm">Dream Academy</span>
-      <span class="block text-dim text-[11px]">{% if role == 'coach' %}{{ t('coach_mode') }}{% else %}{{ t('console_sub') }}{% endif %}</span>
+      <span class="block text-dim text-[11px]">{% if role == 'coach' %}{{ t('coach_mode') }}{% else %}{{ t('console_sub') }}{% endif %} <span class="text-faint num">· {{ BUILD }}</span></span>
     </span>
   </a>
   <div class="flex items-center gap-1.5 text-sm">
