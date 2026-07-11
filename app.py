@@ -139,6 +139,7 @@ def inject_globals():
         "role": current_role(), "DAY_AR": DAY_AR, "lang": lang,
         "dir": "rtl" if lang == "ar" else "ltr",
         "t": lambda key, **kw: translate(lang, key, **kw),
+        "wa_num": jordan_wa_number,
     }
 
 
@@ -405,6 +406,7 @@ def api_renew(pid):
     sub_id, receipt = db.create_subscription(
         con, pid, start,
         price=data.get("price"), amount=data.get("amount"),
+        sessions_total=data.get("sessions_total"),
         method=data.get("method", "cash"), note=data.get("note", ""))
     con.commit()
     con.close()
@@ -674,6 +676,22 @@ def settings_page():
         st["admin_pin"] = (f.get("admin_pin") or "0000").strip()
         st["template_renewal"] = f.get("template_renewal") or st["template_renewal"]
         st["template_absence"] = f.get("template_absence") or st["template_absence"]
+        # bundles (parallel arrays; keep rows that have a name)
+        b_en = f.getlist("bundle_name_en"); b_ar = f.getlist("bundle_name_ar")
+        b_se = f.getlist("bundle_sessions"); b_pr = f.getlist("bundle_price")
+        bundles = []
+        for i in range(len(b_en)):
+            name_en = (b_en[i] or "").strip()
+            name_ar = (b_ar[i] if i < len(b_ar) else "").strip()
+            if not name_en and not name_ar:
+                continue
+            try:
+                bundles.append({"name_en": name_en or name_ar, "name_ar": name_ar or name_en,
+                                "sessions": int(b_se[i] or 1), "price": float(b_pr[i] or 0)})
+            except (ValueError, IndexError):
+                continue
+        if bundles:
+            st["bundles"] = bundles
         db.save_settings(st)
         saved = True
     con = db.get_db()
@@ -705,21 +723,36 @@ def groups_save():
         con.execute("INSERT INTO groups (name_ar,name_en,min_age,max_age,gender,schedule_days,time_slot) VALUES (?,?,?,?,?,?,?)", vals)
     con.commit()
     con.close()
-    return redirect(url_for("settings_page"))
+    return redirect(f.get("back") or url_for("groups_page"))
 
 
 @app.route("/groups/<int:gid>/delete", methods=["POST"])
 @require_role("admin")
 def groups_delete(gid):
+    back = request.form.get("back") or url_for("groups_page")
     con = db.get_db()
     count = con.execute("SELECT COUNT(*) c FROM players WHERE group_id=?", (gid,)).fetchone()["c"]
     if count > 0:
         con.close()
-        return redirect(url_for("settings_page", group_error=gid))
+        sep = "&" if "?" in back else "?"
+        return redirect(f"{back}{sep}group_error={gid}")
     con.execute("DELETE FROM groups WHERE id=?", (gid,))
     con.commit()
     con.close()
-    return redirect(url_for("settings_page"))
+    return redirect(back)
+
+
+@app.route("/groups")
+@require_role("admin")
+def groups_page():
+    con = db.get_db()
+    groups = con.execute(
+        "SELECT g.*, (SELECT COUNT(*) FROM players p WHERE p.group_id=g.id AND p.status IN ('active','frozen','pending')) AS player_count "
+        "FROM groups g ORDER BY g.id").fetchall()
+    con.close()
+    group_error = request.args.get("group_error", type=int)
+    return render_template("groups.html", groups=groups, group_error=group_error,
+                           all_days=list(DAY_AR.keys()))
 
 
 # ---------------- assistant (fake AI) ----------------

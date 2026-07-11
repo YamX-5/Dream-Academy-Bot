@@ -13,20 +13,30 @@
 </div>
 {% endif %}
 
-<!-- group picker (chips) -->
+<!-- group picker (chips + search) -->
 <div class="mb-3">
-  <div class="label-xs mb-1.5">{{ t('group') }}</div>
+  <div class="flex items-center justify-between mb-1.5">
+    <div class="label-xs">{{ t('group') }}</div>
+    {% if groups|length > 4 %}
+    <div class="relative">
+      <span class="absolute {{ 'right-2' if dir == 'rtl' else 'left-2' }} top-1/2 -translate-y-1/2 text-faint">{{ icon('search','w-3.5 h-3.5') }}</span>
+      <input id="groupSearch" oninput="filterGroups(this.value)" placeholder="{{ t('search_group') }}"
+             class="w-40 bg-card border border-edge rounded-md {{ 'pr-7 pl-2' if dir == 'rtl' else 'pl-7 pr-2' }} py-1.5 text-xs focus:border-accent outline-none">
+    </div>
+    {% endif %}
+  </div>
   {% if groups %}
-  <div class="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1" style="scrollbar-width:none">
+  <div id="groupChips" class="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1" style="scrollbar-width:none">
     {% for g in groups %}
-    <button type="button" class="gchip shrink-0 text-start" data-gid="{{ g.id }}" onclick="selectGroup({{ g.id }}, this)">
+    <button type="button" class="gchip shrink-0 text-start" data-gid="{{ g.id }}"
+            data-name="{{ (g.name_ar ~ ' ' ~ g.name_en)|lower }}" onclick="selectGroup({{ g.id }}, this)">
       <div class="whitespace-nowrap">{{ g.name_ar if lang == 'ar' else g.name_en }}</div>
       {% if g.time_slot %}<div class="sub num whitespace-nowrap">{{ g.time_slot }}</div>{% endif %}
     </button>
     {% endfor %}
   </div>
   {% else %}
-  <a href="/settings" class="block bg-card border border-dashed border-edge rounded-xl px-4 py-4 text-center text-dim text-sm">
+  <a href="/groups" class="block bg-card border border-dashed border-edge rounded-lg px-4 py-4 text-center text-dim text-sm">
     {{ t('no_groups_yet') }}
   </a>
   {% endif %}
@@ -328,6 +338,12 @@ function selectGroup(gid, el){
   groupSel.value = gid;
   document.querySelectorAll('.gchip').forEach(c => c.classList.toggle('on', c === el));
   load();
+}
+function filterGroups(q){
+  q = (q||'').trim().toLowerCase();
+  document.querySelectorAll('#groupChips .gchip').forEach(c => {
+    c.style.display = (!q || (c.dataset.name||'').includes(q)) ? '' : 'none';
+  });
 }
 groupSel.addEventListener('change', load);
 

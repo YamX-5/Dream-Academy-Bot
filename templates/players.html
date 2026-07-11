@@ -2,10 +2,14 @@
 {% from "_icons.html" import icon %}
 {% block title %}{{ t('players_title') }}{% endblock %}
 {% block content %}
-<div class="flex items-center justify-between mb-4">
+<div class="flex items-center justify-between gap-2 mb-4">
   <h1 class="text-xl font-bold text-ink">{{ t('players_title') }}</h1>
-  <a href="/players/new" class="flex items-center gap-1.5 bg-accent hover:bg-accent2 text-bg font-semibold px-3.5 py-2 rounded-lg text-sm transition">
-    {{ icon('plus','w-4 h-4') }}{{ t('new_player') }}</a>
+  <div class="flex items-center gap-2">
+    <a href="/groups" class="flex items-center gap-1.5 bg-card border border-edge hover:border-accent/50 text-ink px-3 py-2 rounded-md text-sm font-semibold transition">
+      {{ icon('grid','w-4 h-4') }}{{ t('nav_groups') }}</a>
+    <a href="/players/new" class="flex items-center gap-1.5 bg-accent text-bg font-semibold px-3.5 py-2 rounded-md text-sm transition">
+      {{ icon('plus','w-4 h-4') }}{{ t('new_player') }}</a>
+  </div>
 </div>
 
 <form method="get" class="space-y-2 mb-4">
@@ -38,29 +42,47 @@
   <button class="bg-card2 hover:bg-card3 border border-edge px-4 py-2 rounded-lg text-sm transition">{{ t('apply_filter') }}</button>
 </form>
 
+{% from "_icons.html" import icon %}
 {% set avatar_palette = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
 <div class="space-y-2">
   {% for item in players %}
   {% set p = item.p %}{% set info = item.info %}
   {% set parts = p.full_name.split() %}
-  <a href="/players/{{ p.id }}" class="flex items-center gap-3 bg-card rounded-xl px-3.5 py-3 border transition hover:border-accent/40
+  <div class="flex items-center gap-3 bg-card rounded-lg px-3 py-2.5 border transition hover:border-accent/40
      {{ 'border-bad/40' if info.needs_renewal else 'border-edge' }}">
-    <span class="av" style="background: {{ avatar_palette[p.id % 6] }}">{{ parts[0][0] }}{{ parts[1][0] if parts|length > 1 else '' }}</span>
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2">
-        <span class="font-bold truncate">{{ p.full_name }}</span>
-        {% if p.status=='pending' %}<span class="pill pill-warn">{{ t('pending_badge') }}</span>{% endif %}
-        {% if p.status=='frozen' %}<span class="pill pill-sky">{{ t('st_frozen') }}</span>{% endif %}
-        {% if p.status=='left' %}<span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}
+    <a href="/players/{{ p.id }}" class="flex items-center gap-3 flex-1 min-w-0">
+      <span class="av !rounded-lg" style="background: {{ avatar_palette[p.id % 6] }}">{{ parts[0][0] }}{{ parts[1][0] if parts|length > 1 else '' }}</span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="font-bold truncate">{{ p.full_name }}</span>
+          {% if p.status=='pending' %}<span class="pill pill-warn">{{ t('pending_badge') }}</span>{% endif %}
+          {% if p.status=='frozen' %}<span class="pill pill-sky">{{ t('st_frozen') }}</span>{% endif %}
+          {% if p.status=='left' %}<span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}
+        </div>
+        <div class="text-[11px] mt-0.5 num {{ 'text-bad' if not info.active else ('text-warn' if info.needs_renewal else 'text-dim') }}">
+          {% if info.active %}
+            {{ t('left_expires', n=info.left, d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7]) }}
+          {% else %}{{ t('no_active_sub') }}{% endif %}
+          <span class="text-faint"> · {{ p.group_name or '—' }}</span>
+        </div>
       </div>
-      <div class="text-xs mt-0.5 num {{ 'text-bad' if not info.active else ('text-warn' if info.needs_renewal else 'text-dim') }}">
-        {% if info.active %}
-          {{ t('left_expires', n=info.left, d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7]) }}
-        {% else %}{{ t('no_active_sub') }}{% endif %}
-      </div>
+    </a>
+    <div class="flex items-center gap-1.5 shrink-0">
+      {% if p.guardian_phone %}
+      <a href="https://wa.me/{{ wa_num(p.guardian_phone) }}" target="_blank" title="{{ t('wa_guardian') }}"
+         class="relative w-9 h-9 grid place-items-center rounded-lg text-white" style="background:#25D366">
+        {{ icon('whatsapp','w-4 h-4') }}
+        <span class="absolute -top-1 -end-1 w-4 h-4 rounded-full bg-violet text-white text-[9px] font-bold grid place-items-center border-2 border-card">{{ icon('users','w-2.5 h-2.5') }}</span>
+      </a>
+      {% endif %}
+      {% if p.phone %}
+      <a href="https://wa.me/{{ wa_num(p.phone) }}" target="_blank" title="{{ t('wa_player') }}"
+         class="w-9 h-9 grid place-items-center rounded-lg text-white" style="background:#25D366">
+        {{ icon('whatsapp','w-4 h-4') }}
+      </a>
+      {% endif %}
     </div>
-    <div class="text-[11px] text-dim shrink-0 text-end">{{ p.group_name or '—' }}</div>
-  </a>
+  </div>
   {% else %}
   <div class="text-center text-dim py-10">{{ t('no_results') }}</div>
   {% endfor %}

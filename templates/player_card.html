@@ -116,11 +116,27 @@
 
 <!-- renewal modal -->
 <div id="renewModal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-3">
-  <div class="bg-card rounded-xl p-5 w-full max-w-md border border-edge">
-    <h3 class="font-bold text-lg mb-4">{{ t('renew_title') }}</h3>
-    <label class="label-xs" for="rAmount">{{ t('amount') }}</label>
-    <input id="rAmount" type="number" step="0.5" value="{{ settings.monthly_price }}"
-           class="w-full bg-bg border border-edge rounded-lg px-3 py-3 mt-1 mb-3 num focus:border-accent outline-none" />
+  <div class="bg-card rounded-lg p-5 w-full max-w-md border border-edge">
+    <h3 class="font-bold text-lg mb-3">{{ t('renew_title') }}</h3>
+    <label class="label-xs mb-1.5 block">{{ t('bundle') }}</label>
+    <div class="grid grid-cols-3 gap-2 mb-3">
+      {% for b in settings.bundles %}
+      <button type="button" onclick="pickBundle({{ b.price }}, {{ b.sessions }}, this)"
+              class="bundle-opt bg-bg border border-edge rounded-md px-2 py-2.5 text-center transition hover:border-accent/60"
+              data-i="{{ loop.index0 }}">
+        <div class="font-bold text-sm truncate">{{ b.name_ar if lang == 'ar' else b.name_en }}</div>
+        <div class="text-[11px] text-dim num">{{ b.sessions }} · {{ b.price }} JD</div>
+      </button>
+      {% endfor %}
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div><label class="label-xs" for="rAmount">{{ t('amount') }}</label>
+        <input id="rAmount" type="number" step="0.5" value="{{ settings.bundles[0].price if settings.bundles else settings.monthly_price }}"
+               class="w-full bg-bg border border-edge rounded-md px-3 py-2.5 mt-1 num focus:border-accent outline-none" /></div>
+      <div><label class="label-xs" for="rSessions">{{ t('sessions_count') }}</label>
+        <input id="rSessions" type="number" value="{{ settings.bundles[0].sessions if settings.bundles else settings.sessions_per_month }}"
+               class="w-full bg-bg border border-edge rounded-md px-3 py-2.5 mt-1 num focus:border-accent outline-none" /></div>
+    </div>
     <label class="label-xs" for="rMethod">{{ t('method') }}</label>
     <select id="rMethod" class="w-full bg-bg border border-edge rounded-lg px-3 py-3 mt-1 mb-3 focus:border-accent outline-none">
       <option value="cash">{{ t('cash') }}</option>
@@ -148,10 +164,18 @@ async function act(what) {
   await fetch(`/api/players/{{ p.id }}/${what}`, {method:'POST'});
   location.reload();
 }
+function pickBundle(price, sessions, el) {
+  document.getElementById('rAmount').value = price;
+  document.getElementById('rSessions').value = sessions;
+  document.querySelectorAll('.bundle-opt').forEach(b => b.classList.remove('on'));
+  el.classList.add('on');
+}
 async function renew() {
   const afterExpiry = document.getElementById('rAfterExpiry');
   const body = {
     amount: parseFloat(document.getElementById('rAmount').value || '{{ settings.monthly_price }}'),
+    price: parseFloat(document.getElementById('rAmount').value || '{{ settings.monthly_price }}'),
+    sessions_total: parseInt(document.getElementById('rSessions').value || '{{ settings.sessions_per_month }}'),
     method: document.getElementById('rMethod').value,
     start_date: (afterExpiry && afterExpiry.checked) ? '{{ prev_expiry }}' : '{{ today }}'
   };

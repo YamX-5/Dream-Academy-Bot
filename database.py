@@ -21,6 +21,12 @@ DEFAULT_SETTINGS = {
     "admin_pin": "0000",
     "template_renewal": "مرحبا، اشتراك [الاسم] بأكاديمية Dream Academy قرّب يخلص (ضل [X] حصص). للتجديد: [السعر] دينار بالشهر. يعطيكم العافية.",
     "template_absence": "مرحبا، لاحظنا غياب [الاسم] عن تمرين اليوم — إن شاء الله كل شي تمام؟",
+    # subscription bundles the admin can pick at renewal
+    "bundles": [
+        {"name_en": "Monthly", "name_ar": "شهري", "sessions": 12, "price": 20},
+        {"name_en": "8 sessions", "name_ar": "8 حصص", "sessions": 8, "price": 15},
+        {"name_en": "Single", "name_ar": "حصة", "sessions": 1, "price": 3},
+    ],
 }
 
 SEED_GROUPS = [

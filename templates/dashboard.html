@@ -23,29 +23,21 @@
   <a href="/attendance" class="bg-accent text-bg font-bold px-4 py-2.5 rounded-lg text-sm shrink-0">{{ t('hero_cta') }}</a>
 </div>
 
-<!-- KPI ROW with sparklines -->
-{% set att_vals = att_chart|map(attribute='v')|list %}{% set att_max = att_vals|max if att_vals else 0 %}
-{% set rev_vals = rev_chart|map(attribute='v')|list %}{% set rev_max = rev_vals|max if rev_vals else 0 %}
-<div class="grid grid-cols-2 gap-2.5 mb-5">
-  <div class="kpi bg-card rounded-xl p-4 border border-edge">
+<!-- KPI ROW -->
+<div class="grid grid-cols-2 gap-2 mb-5">
+  <div class="kpi bg-card rounded-lg p-3.5 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_active') }}</div>
     <div class="text-2xl font-extrabold num text-ink">{{ kpis.active_players }}</div>
   </div>
-  <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
+  <div class="kpi kpi-ok bg-card rounded-lg p-3.5 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_present') }}</div>
-    <div class="flex items-end justify-between">
-      <div class="text-2xl font-extrabold num text-ink">{{ kpis.present_today }}</div>
-      {% if att_vals %}<div class="gr-spark">{% for v in att_vals %}<i style="height: {{ (2 + (v / att_max * 20)) | round | int if att_max else 2 }}px"></i>{% endfor %}</div>{% endif %}
-    </div>
+    <div class="text-2xl font-extrabold num text-ink">{{ kpis.present_today }}</div>
   </div>
-  <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
+  <div class="kpi kpi-ok bg-card rounded-lg p-3.5 border border-edge">
     <div class="label-xs mb-1">{{ t('kpi_revenue') }}</div>
-    <div class="flex items-end justify-between">
-      <div class="text-2xl font-extrabold num text-ok">{{ kpis.revenue_month }}<span class="text-sm font-semibold"> JD</span></div>
-      {% if rev_vals %}<div class="gr-spark">{% for v in rev_vals %}<i style="height: {{ (2 + (v / rev_max * 20)) | round | int if rev_max else 2 }}px"></i>{% endfor %}</div>{% endif %}
-    </div>
+    <div class="text-2xl font-extrabold num text-ok">{{ kpis.revenue_month }}<span class="text-sm font-semibold"> JD</span></div>
   </div>
-  <div class="kpi {{ 'kpi-bad' if kpis.unpaid_count else '' }} bg-card rounded-xl p-4 border {{ 'border-bad/50' if kpis.unpaid_count else 'border-edge' }}">
+  <div class="kpi {{ 'kpi-bad' if kpis.unpaid_count else '' }} bg-card rounded-lg p-3.5 border {{ 'border-bad/50' if kpis.unpaid_count else 'border-edge' }}">
     <div class="label-xs mb-1">{{ t('kpi_unpaid') }}</div>
     <div class="text-2xl font-extrabold num {{ 'text-bad' if kpis.unpaid_count else 'text-ink' }}">{{ kpis.unpaid_count }}</div>
   </div>
