@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set pal = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
+
+{% macro coach_form(c) %}
+<form method="post" action="/coaches/save" class="space-y-2">
+  {% if c %}<input type="hidden" name="id" value="{{ c.id }}">{% endif %}
+  <div><label class="label-xs">{{ t('coach_name') }}</label>
+    <input name="name" required value="{{ c.name if c else '' }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 text-sm mt-0.5 focus:border-accent outline-none"></div>
+  <div><label class="label-xs">{{ t('coach_phone') }}</label>
+    <input name="phone" value="{{ c.phone if c else '' }}" inputmode="tel" placeholder="07XXXXXXXX" class="w-full bg-bg border border-edge rounded-md px-2 py-2 text-sm num mt-0.5 focus:border-accent outline-none"></div>
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="label-xs">{{ t('salary_type') }}</label>
+      <select name="salary_type" class="w-full bg-bg border border-edge rounded-md px-2 py-2 text-sm mt-0.5 focus:border-accent outline-none">
+        <option value="monthly" {% if c and c.salary_type=='monthly' %}selected{% endif %}>{{ t('salary_monthly') }}</option>
+        <option value="session" {% if c and c.salary_type=='session' %}selected{% endif %}>{{ t('salary_session') }}</option>
+      </select></div>
+    <div><label class="label-xs">{{ t('salary_amount') }}</label>
+      <input name="salary_amount" type="number" step="0.5" value="{{ c.salary_amount if c else '' }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 text-sm num mt-0.5 focus:border-accent outline-none"></div>
+  </div>
+  <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="active" {% if not c or c.active %}checked{% endif %}> {{ t('coach_active') }}</label>
+  <button class="w-full bg-accent text-bg font-semibold rounded-md py-2 text-sm">{{ t('save') }}</button>
+</form>
+{% if c %}
+<form method="post" action="/coaches/{{ c.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_coach')|tojson }})" class="text-center pt-2">
+  <button class="text-bad text-xs">{{ t('delete') }}</button>
+</form>
+{% endif %}
+{% endmacro %}
+
+{% block title %}{{ t('finance_title') }}{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between gap-2 mb-3">
+  <h1 class="text-xl font-bold text-ink flex items-center gap-2">
+    <span class="text-accent">{{ icon('wallet','w-5 h-5') }}</span>{{ t('finance_title') }}
+  </h1>
+  <form method="get">
+    <select name="month" onchange="this.form.submit()" class="bg-card border border-edge rounded-md px-2 py-1.5 text-sm num focus:border-accent outline-none">
+      {% for m in months %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ m }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<!-- finance summary -->
+<div class="grid grid-cols-2 gap-2 mb-5">
+  <div class="kpi kpi-ok bg-card rounded-lg p-3 border border-edge">
+    <div class="label-xs mb-0.5">{{ t('fin_revenue') }}</div>
+    <div class="text-xl font-extrabold num text-ok">{{ fin.revenue }}<span class="text-xs"> JD</span></div>
+  </div>
+  <div class="kpi kpi-bad bg-card rounded-lg p-3 border border-edge">
+    <div class="label-xs mb-0.5">{{ t('fin_expenses') }}</div>
+    <div class="text-xl font-extrabold num text-bad">{{ fin.expenses }}<span class="text-xs"> JD</span></div>
+    <div class="text-[10px] text-faint num mt-0.5">{{ t('fin_salaries') }} {{ fin.salaries }} · {{ t('fin_other') }} {{ fin.other }}</div>
+  </div>
+  <div class="kpi {{ 'kpi-ok' if fin.profit >= 0 else 'kpi-bad' }} bg-card rounded-lg p-3 border border-edge">
+    <div class="label-xs mb-0.5">{{ t('fin_profit') }}</div>
+    <div class="text-xl font-extrabold num {{ 'text-ok' if fin.profit >= 0 else 'text-bad' }}">{{ fin.profit }}<span class="text-xs"> JD</span></div>
+  </div>
+  <div class="kpi bg-card rounded-lg p-3 border border-edge">
+    <div class="label-xs mb-0.5">{{ t('fin_margin') }}</div>
+    <div class="text-xl font-extrabold num {{ 'text-ok' if (fin.margin or 0) >= 0 else 'text-bad' }}">{{ fin.margin if fin.margin is not none else '—' }}{% if fin.margin is not none %}%{% endif %}</div>
+  </div>
+</div>
+
+<!-- coaches -->
+<h2 class="font-bold text-ink flex items-center gap-2 mb-2"><span class="text-accent">{{ icon('whistle','w-4 h-4') }}</span>{{ t('coaches_title') }}</h2>
+<div class="space-y-2 mb-3">
+  {% for c in coaches %}
+  <div class="bg-card rounded-lg border border-edge px-3 py-2.5 flex items-center gap-3 {{ '' if c.active else 'opacity-60' }}">
+    <span class="av !rounded-lg" style="background: {{ pal[c.id % 6] }}">{{ c.name[0] }}</span>
+    <div class="flex-1 min-w-0">
+      <div class="font-bold truncate">{{ c.name }}{% if not c.active %} <span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}</div>
+      <div class="text-[11px] text-dim num">
+        {{ t('salary_monthly') if c.salary_type=='monthly' else t('salary_session') }} · {{ c.salary_amount }} JD
+        · {{ t('sessions_this_month', n=c.sessions) }} · {{ t('cost_this_month') }} {{ c.cost }} JD
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5 shrink-0">
+      {% if c.phone %}<a href="https://wa.me/{{ wa_num(c.phone) }}" target="_blank" class="w-8 h-8 grid place-items-center rounded-lg text-white" style="background:#25D366">{{ icon('whatsapp','w-4 h-4') }}</a>{% endif %}
+      <button onclick="togglePresent({{ c.id }}, this)"
+              class="present-btn w-8 h-8 grid place-items-center rounded-lg border transition {{ 'bg-ok text-white border-ok' if c.present_today else 'bg-card2 border-edge text-dim' }}"
+              title="{{ t('present_today_btn') }}">{{ icon('check','w-4 h-4') }}</button>
+      <details class="relative">
+        <summary class="w-8 h-8 grid place-items-center rounded-lg bg-card2 border border-edge text-dim cursor-pointer">{{ icon('edit','w-3.5 h-3.5') }}</summary>
+        <div class="absolute z-20 end-0 mt-1 w-64 bg-card border border-edge rounded-lg p-3" style="box-shadow:var(--shadow)">
+          {{ coach_form(c) }}
+        </div>
+      </details>
+    </div>
+  </div>
+  {% else %}
+  <div class="text-center text-dim text-sm py-3">{{ t('no_coaches') }}</div>
+  {% endfor %}
+</div>
+<details class="bg-card rounded-lg border border-dashed border-edge mb-6">
+  <summary class="px-4 py-3 flex items-center gap-2 cursor-pointer text-accent font-semibold">{{ icon('plus-circle','w-5 h-5') }}{{ t('add_coach') }}</summary>
+  <div class="px-4 pb-4 pt-1 border-t border-edge2">{{ coach_form(none) }}</div>
+</details>
+
+<!-- expenses -->
+<h2 class="font-bold text-ink flex items-center gap-2 mb-2"><span class="text-accent">{{ icon('wallet','w-4 h-4') }}</span>{{ t('expenses_title') }}</h2>
+<form method="post" action="/expenses/save" class="bg-card rounded-lg border border-edge p-3 mb-2 grid grid-cols-12 gap-2">
+  <input name="note" placeholder="{{ t('expense_note') }}" class="col-span-5 bg-bg border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
+  <input name="amount" type="number" step="0.5" required placeholder="{{ t('expense_amount') }}" class="col-span-3 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
+  <input name="date" type="date" value="{{ today }}" class="col-span-4 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
+  <button class="col-span-12 bg-accent text-bg font-semibold rounded-md py-2 text-sm">{{ t('add_expense') }}</button>
+</form>
+<div class="bg-card rounded-lg border border-edge divide-y divide-edge2 mb-6">
+  {% for e in expenses %}
+  <div class="px-3 py-2.5 flex items-center justify-between text-sm">
+    <div class="min-w-0"><div class="font-semibold truncate">{{ e.note or t('expenses_title') }}</div>
+      <div class="text-[11px] text-dim num">{{ e.date }}</div></div>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="font-bold num text-bad">-{{ e.amount }} JD</span>
+      <form method="post" action="/expenses/{{ e.id }}/delete"><button class="text-dim hover:text-bad">{{ icon('x','w-4 h-4') }}</button></form>
+    </div>
+  </div>
+  {% else %}<div class="px-3 py-4 text-center text-dim text-sm">{{ t('no_expenses') }}</div>{% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function togglePresent(id, btn){
+  const r = await fetch(`/coaches/${id}/present`, {method:'POST'});
+  if(!r.ok) return;
+  const d = await r.json();
+  btn.className = 'present-btn w-8 h-8 grid place-items-center rounded-lg border transition '
+    + (d.present ? 'bg-ok text-white border-ok' : 'bg-card2 border-edge text-dim');
+}
+</script>
+{% endblock %}

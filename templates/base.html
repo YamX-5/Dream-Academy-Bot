@@ -211,10 +211,10 @@ tailwind.config = { theme: { extend: {
     {% if role == 'admin' %}
     <a href="/players" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/players') %}active{% endif %}">
       {{ icon('users','w-5 h-5') }}{{ t('nav_players') }}</a>
+    <a href="/finance" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/finance') or request.path.startswith('/coaches') %}active{% endif %}">
+      {{ icon('wallet','w-5 h-5') }}{{ t('nav_finance') }}</a>
     <a href="/analytics" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/analytics') %}active{% endif %}">
       {{ icon('analytics','w-5 h-5') }}{{ t('nav_analytics') }}</a>
-    <a href="/payments" class="navlink py-2.5 flex flex-col items-center gap-1 {% if request.path.startswith('/payments') %}active{% endif %}">
-      {{ icon('wallet','w-5 h-5') }}{{ t('nav_payments') }}</a>
     {% endif %}
   </div>
 </nav>

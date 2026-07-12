@@ -38,7 +38,7 @@ app.secret_key = "dream-academy-local-secret-key-2026"
 app.json.ensure_ascii = False
 
 # bump this string whenever the UI changes so you can confirm a fresh load
-BUILD = "v8 · 2026-07-11"
+BUILD = "v9 · 2026-07-11"
 
 
 @app.after_request
@@ -287,10 +287,11 @@ def dashboard():
     # birthdays this month
     mm = date.today().strftime("%m")
     bdays = [dict(p) for p in players if p["birth_date"] and p["birth_date"][5:7] == mm]
+    fin = db.finance(con, month)
     con.close()
     return render_template("dashboard.html", kpis=kpis, alerts=alerts, unpaid=unpaid,
                            pending=pending, att_chart=att_chart, rev_chart=rev_chart,
-                           grp_chart=grp_chart, bdays=bdays, public_url=PUBLIC_URL["url"])
+                           grp_chart=grp_chart, bdays=bdays, fin=fin, public_url=PUBLIC_URL["url"])
 
 
 # ---------------- players ----------------
@@ -877,12 +878,20 @@ def analytics_page():
             "لسا ما في بيانات كافية لتحليل — سجّل حضور ودفعات أكثر." if current_lang() == "ar"
             else "Not enough data yet — log more attendance and payments.")})
 
+    fin = db.finance(con, month)
+    # revenue vs expenses vs profit across recent months (for a column chart)
+    fin_months = []
+    d0 = today.replace(day=1)
+    for i in range(5, -1, -1):
+        mm = (d0 - timedelta(days=30 * i)).strftime("%Y-%m")
+        f = db.finance(con, mm)
+        fin_months.append({"d": mm[2:], "rev": f["revenue"], "exp": f["expenses"], "profit": f["profit"]})
     con.close()
     return render_template("analytics.html",
                            kpi={"total": total_players, "active": active, "rate": rate or 0, "revenue": rev},
                            att_chart=att_chart, rev_chart=rev_chart, grp_chart=grp_chart,
                            new_chart=new_chart, at_risk=at_risk[:6], insights=insights,
-                           best_group=best_group)
+                           best_group=best_group, fin=fin, fin_months=fin_months)
 
 
 def ai_insight_att_up(lang, diff, rate):
@@ -911,6 +920,111 @@ def ai_insight_rev(lang, dirn, rev, prev):
                 else f"Revenue is higher than last month ({rev:g} vs {prev:g} JD).")
     return (f"الإيراد أقل من الشهر الماضي ({rev:g} مقابل {prev:g} دينار)." if lang == "ar"
             else f"Revenue is lower than last month ({rev:g} vs {prev:g} JD).")
+
+
+# ---------------- finance: coaches, salaries, expenses, profit ----------------
+
+@app.route("/finance")
+@require_role("admin")
+def finance_page():
+    month = request.args.get("month") or date.today().strftime("%Y-%m")
+    con = db.get_db()
+    fin = db.finance(con, month)
+    today = date.today().isoformat()
+    coaches = []
+    for c in con.execute("SELECT * FROM coaches ORDER BY active DESC, name").fetchall():
+        present_today = con.execute(
+            "SELECT 1 FROM coach_attendance WHERE coach_id=? AND session_date=?", (c["id"], today)).fetchone()
+        coaches.append({**dict(c),
+                        "sessions": db.coach_month_sessions(con, c["id"], month),
+                        "cost": db.coach_month_cost(con, c, month),
+                        "present_today": bool(present_today)})
+    expenses = con.execute(
+        "SELECT * FROM expenses WHERE date LIKE ? ORDER BY date DESC, id DESC", (month + "%",)).fetchall()
+    months = [r["m"] for r in con.execute(
+        "SELECT DISTINCT substr(date,1,7) m FROM payments UNION SELECT DISTINCT substr(date,1,7) FROM expenses "
+        "ORDER BY m DESC").fetchall()]
+    if month not in months:
+        months.insert(0, month)
+    con.close()
+    return render_template("finance.html", fin=fin, coaches=coaches, expenses=expenses,
+                           month=month, months=months, today=today)
+
+
+@app.route("/coaches/save", methods=["POST"])
+@require_role("admin")
+def coaches_save():
+    f = request.form
+    con = db.get_db()
+    cid = f.get("id")
+    vals = (f.get("name", "").strip(), (f.get("phone") or "").strip(),
+            f.get("salary_type") or "monthly", float(f.get("salary_amount") or 0),
+            1 if f.get("active") else 0)
+    if cid:
+        con.execute("UPDATE coaches SET name=?,phone=?,salary_type=?,salary_amount=?,active=? WHERE id=?",
+                    vals + (cid,))
+    else:
+        con.execute("INSERT INTO coaches (name,phone,salary_type,salary_amount,active,join_date) "
+                    "VALUES (?,?,?,?,?,?)", vals + (date.today().isoformat(),))
+    con.commit()
+    con.close()
+    return redirect(url_for("finance_page"))
+
+
+@app.route("/coaches/<int:cid>/delete", methods=["POST"])
+@require_role("admin")
+def coaches_delete(cid):
+    con = db.get_db()
+    has_att = con.execute("SELECT 1 FROM coach_attendance WHERE coach_id=? LIMIT 1", (cid,)).fetchone()
+    if has_att:
+        con.execute("UPDATE coaches SET active=0 WHERE id=?", (cid,))  # keep history
+    else:
+        con.execute("DELETE FROM coaches WHERE id=?", (cid,))
+    con.commit()
+    con.close()
+    return redirect(url_for("finance_page"))
+
+
+@app.route("/coaches/<int:cid>/present", methods=["POST"])
+@require_role("admin")
+def coach_present(cid):
+    """Toggle a coach's attendance for today."""
+    con = db.get_db()
+    today = date.today().isoformat()
+    row = con.execute("SELECT id FROM coach_attendance WHERE coach_id=? AND session_date=?",
+                      (cid, today)).fetchone()
+    if row:
+        con.execute("DELETE FROM coach_attendance WHERE id=?", (row["id"],))
+        present = False
+    else:
+        con.execute("INSERT INTO coach_attendance (coach_id, session_date) VALUES (?,?)", (cid, today))
+        present = True
+    con.commit()
+    con.close()
+    return jsonify({"ok": True, "present": present})
+
+
+@app.route("/expenses/save", methods=["POST"])
+@require_role("admin")
+def expenses_save():
+    f = request.form
+    con = db.get_db()
+    con.execute("INSERT INTO expenses (date, category, amount, note) VALUES (?,?,?,?)",
+                (f.get("date") or date.today().isoformat(), (f.get("category") or "other").strip(),
+                 float(f.get("amount") or 0), (f.get("note") or "").strip()))
+    con.commit()
+    con.close()
+    return redirect(url_for("finance_page", month=(f.get("date") or "")[:7] or None))
+
+
+@app.route("/expenses/<int:eid>/delete", methods=["POST"])
+@require_role("admin")
+def expenses_delete(eid):
+    con = db.get_db()
+    con.execute("DELETE FROM expenses WHERE id=?", (eid,))
+    con.commit()
+    con.close()
+    return redirect(request.referrer or url_for("finance_page"))
 
 
 # ---------------- excel ----------------

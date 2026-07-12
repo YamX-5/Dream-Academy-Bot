@@ -5,50 +5,45 @@
 {% set pal = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
 {% macro avatar(name, id) %}{% set pp = name.split() %}<span class="av" style="background: {{ pal[id % 6] }}">{{ pp[0][0] }}{{ pp[1][0] if pp|length > 1 else '' }}</span>{% endmacro %}
 
-<!-- HERO -->
-<div class="gr-hero flex items-center gap-4 mb-4">
-  <div class="gr-pulse">{{ icon('clock' if alerts else 'chart','w-6 h-6') }}</div>
+<!-- compact hero -->
+<div class="gr-hero flex items-center gap-3 mb-3 !py-3 !px-4">
+  <div class="gr-pulse !w-10 !h-10">{{ icon('clock' if alerts else 'chart','w-5 h-5') }}</div>
   <div class="min-w-0 flex-1">
     {% if alerts %}
-    <div class="text-2xl font-extrabold text-ink leading-tight"><span class="num text-warn">{{ alerts|length }}</span> {{ 'لاعب' if lang=='ar' else 'players' }} {{ t('hero_need_renewal') }}</div>
-    <div class="text-xs text-dim mt-1">{{ t('hero_renewal_sub') }}</div>
+    <div class="text-lg font-extrabold text-ink leading-tight"><span class="num text-warn">{{ alerts|length }}</span> {{ 'لاعب' if lang=='ar' else 'players' }} {{ t('hero_need_renewal') }}</div>
+    <div class="text-[11px] text-dim">{{ t('hero_renewal_sub') }}</div>
     {% elif kpis.attendance_rate is not none %}
-    <div class="text-2xl font-extrabold text-ink leading-tight num text-ok">{{ kpis.attendance_rate }}%</div>
-    <div class="text-xs text-dim mt-1">{{ t('hero_att_sub') }}</div>
+    <div class="text-lg font-extrabold text-ink leading-tight"><span class="num text-ok">{{ kpis.attendance_rate }}%</span> {{ t('an_rate')|lower }}</div>
+    <div class="text-[11px] text-dim">{{ t('hero_att_sub') }}</div>
     {% else %}
-    <div class="text-2xl font-extrabold text-ink leading-tight">{{ t('hero_all_clear') }}</div>
-    <div class="text-xs text-dim mt-1">{{ t('hero_all_clear_sub') }}</div>
+    <div class="text-lg font-extrabold text-ink leading-tight">{{ t('hero_all_clear') }}</div>
+    <div class="text-[11px] text-dim">{{ t('hero_all_clear_sub') }}</div>
     {% endif %}
   </div>
-  <a href="/attendance" class="bg-accent text-bg font-bold px-4 py-2.5 rounded-lg text-sm shrink-0">{{ t('hero_cta') }}</a>
+  <a href="/attendance" class="bg-accent text-bg font-bold px-3.5 py-2 rounded-md text-sm shrink-0">{{ t('hero_cta') }}</a>
 </div>
 
-<!-- KPI ROW -->
-<div class="grid grid-cols-2 gap-2 mb-5">
-  <div class="kpi bg-card rounded-lg p-3.5 border border-edge">
-    <div class="label-xs mb-1">{{ t('kpi_active') }}</div>
-    <div class="text-2xl font-extrabold num text-ink">{{ kpis.active_players }}</div>
+<!-- compact stat strip (horizontal scroll) -->
+<div class="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1 mb-4" style="scrollbar-width:none">
+  {% macro stat(label, value, unit, cls, barcls) %}
+  <div class="kpi {{ barcls }} bg-card rounded-lg border border-edge px-3 py-2.5 shrink-0 min-w-[100px]">
+    <div class="label-xs mb-0.5">{{ label }}</div>
+    <div class="text-xl font-extrabold num {{ cls }}">{{ value }}{% if unit %}<span class="text-[11px] font-semibold"> {{ unit }}</span>{% endif %}</div>
   </div>
-  <div class="kpi kpi-ok bg-card rounded-lg p-3.5 border border-edge">
-    <div class="label-xs mb-1">{{ t('kpi_present') }}</div>
-    <div class="text-2xl font-extrabold num text-ink">{{ kpis.present_today }}</div>
-  </div>
-  <div class="kpi kpi-ok bg-card rounded-lg p-3.5 border border-edge">
-    <div class="label-xs mb-1">{{ t('kpi_revenue') }}</div>
-    <div class="text-2xl font-extrabold num text-ok">{{ kpis.revenue_month }}<span class="text-sm font-semibold"> JD</span></div>
-  </div>
-  <div class="kpi {{ 'kpi-bad' if kpis.unpaid_count else '' }} bg-card rounded-lg p-3.5 border {{ 'border-bad/50' if kpis.unpaid_count else 'border-edge' }}">
-    <div class="label-xs mb-1">{{ t('kpi_unpaid') }}</div>
-    <div class="text-2xl font-extrabold num {{ 'text-bad' if kpis.unpaid_count else 'text-ink' }}">{{ kpis.unpaid_count }}</div>
-  </div>
+  {% endmacro %}
+  {{ stat(t('kpi_active'), kpis.active_players, '', 'text-ink', '') }}
+  {{ stat(t('kpi_present'), kpis.present_today, '', 'text-ink', 'kpi-ok') }}
+  {{ stat(t('fin_revenue'), fin.revenue, 'JD', 'text-ok', 'kpi-ok') }}
+  {{ stat(t('fin_profit'), fin.profit, 'JD', 'text-ok' if fin.profit >= 0 else 'text-bad', 'kpi-ok' if fin.profit >= 0 else 'kpi-bad') }}
+  {{ stat(t('fin_margin'), (fin.margin ~ '%') if fin.margin is not none else '—', '', 'text-ink', '') }}
+  {{ stat(t('kpi_unpaid'), kpis.unpaid_count, '', 'text-bad' if kpis.unpaid_count else 'text-ink', 'kpi-bad' if kpis.unpaid_count else '') }}
 </div>
 
-<!-- RADAR -->
-<h2 class="flex items-center gap-2 font-bold mb-2.5 text-ink">
+<!-- RADAR (the actionable core) -->
+<h2 class="flex items-center gap-2 font-bold mb-2 text-ink">
   <span class="text-accent">{{ icon('alert','w-4 h-4') }}</span>{{ t('radar_title') }}
 </h2>
-<div class="grid gap-3 sm:grid-cols-3 mb-6">
-  <!-- pending -->
+<div class="grid gap-2.5 sm:grid-cols-3 mb-5">
   <div class="gr-col violet">
     <div class="hd"><span class="dot"></span><span class="t">{{ t('pending_approval') }}</span><span class="cnt num">{{ pending|length }}</span></div>
     {% for p in pending %}
@@ -65,7 +60,6 @@
     </div>
     {% else %}<div class="gr-empty">—</div>{% endfor %}
   </div>
-  <!-- renewal -->
   <div class="gr-col warn">
     <div class="hd"><span class="dot"></span><span class="t">{{ t('renewal_alerts') }}</span><span class="cnt num">{{ alerts|length }}</span></div>
     {% for a in alerts %}
@@ -77,12 +71,11 @@
           {% if a.active %}{{ t('alert_left_days', n=a.left, d=a.days_left) }}{% else %}{{ t('expired_needs_renewal') }}{% endif %}</div>
       </a>
       {% if a.player.guardian_phone or a.player.phone %}
-      <a href="{{ a.wa }}" target="_blank" title="{{ t('whatsapp') }}" class="w-8 h-8 grid place-items-center rounded-lg text-white shrink-0 transition" style="background:#25D366">{{ icon('message','w-4 h-4') }}</a>
+      <a href="{{ a.wa }}" target="_blank" title="{{ t('whatsapp') }}" class="w-8 h-8 grid place-items-center rounded-lg text-white shrink-0 transition" style="background:#25D366">{{ icon('whatsapp','w-4 h-4') }}</a>
       {% endif %}
     </div>
     {% else %}<div class="gr-empty">—</div>{% endfor %}
   </div>
-  <!-- unpaid -->
   <div class="gr-col bad">
     <div class="hd"><span class="dot"></span><span class="t">{{ t('unpaid_title') }}</span><span class="cnt num">{{ unpaid|length }}</span></div>
     {% for u in unpaid %}
@@ -97,68 +90,33 @@
   </div>
 </div>
 
-<h2 class="flex items-center gap-2 font-bold mb-2.5 text-ink">
-  <span class="text-accent">{{ icon('chart','w-4 h-4') }}</span>{{ t('charts') }}
-</h2>
-<div class="space-y-3 mb-6">
-  <div class="bg-card rounded-lg p-4 border border-edge">
-    <div class="flex items-center justify-between mb-2">
-      <div class="label-xs">{{ t('chart_att') }}</div>
-      {% if kpis.attendance_rate is not none %}
-      <div class="text-sm font-semibold num {{ 'text-ok' if kpis.attendance_rate >= 75 else ('text-warn' if kpis.attendance_rate >= 50 else 'text-bad') }}">
-        {{ kpis.attendance_rate }}% <span class="text-dim font-normal text-xs">{{ t('kpi_att_rate') }}</span>
-      </div>
-      {% endif %}
-    </div>
-    <canvas id="attChart" height="130"></canvas>
-  </div>
-  <div class="bg-card rounded-lg p-4 border border-edge">
-    <div class="label-xs mb-2">{{ t('chart_rev') }}</div>
-    <canvas id="revChart" height="130"></canvas>
-  </div>
-  <div class="bg-card rounded-lg p-4 border border-edge">
-    <div class="label-xs mb-2">{{ t('chart_grp') }}</div>
-    <canvas id="grpChart" height="130"></canvas>
-  </div>
-</div>
-
 {% if bdays %}
-<h2 class="flex items-center gap-2 font-semibold mb-2 text-ink">
-  <span class="text-accent">{{ icon('gift','w-4 h-4') }}</span>{{ t('birthdays') }}
-</h2>
-<div class="bg-card rounded-lg px-4 py-2 border border-edge mb-6 divide-y divide-edge2">
+<div class="bg-card rounded-lg px-3 py-1.5 border border-edge mb-4 divide-y divide-edge2">
+  <div class="flex items-center gap-2 py-1.5 text-xs font-semibold text-dim"><span class="text-accent">{{ icon('gift','w-3.5 h-3.5') }}</span>{{ t('birthdays') }}</div>
   {% for b in bdays %}
-  <div class="flex justify-between items-center py-2">
+  <div class="flex justify-between items-center py-1.5 text-sm">
     <a href="/players/{{ b.id }}" class="font-medium hover:text-accent transition">{{ b.full_name }}</a>
-    <span class="text-dim text-sm num">{{ b.birth_date[8:10] }}/{{ b.birth_date[5:7] }}</span>
+    <span class="text-dim num">{{ b.birth_date[8:10] }}/{{ b.birth_date[5:7] }}</span>
   </div>
   {% endfor %}
 </div>
 {% endif %}
 
-<div class="flex flex-wrap gap-2">
-  <a href="/export/all" class="flex items-center gap-2 bg-accent hover:bg-accent2 text-bg font-semibold px-4 py-2.5 rounded-lg text-sm transition">
+<!-- quick actions -->
+<div class="grid grid-cols-2 gap-2">
+  <a href="/finance" class="flex items-center gap-2 bg-card2 hover:bg-card3 border border-edge px-3 py-2.5 rounded-md text-sm font-semibold transition">
+    {{ icon('wallet','w-4 h-4') }}{{ t('nav_finance') }}</a>
+  <a href="/analytics" class="flex items-center gap-2 bg-card2 hover:bg-card3 border border-edge px-3 py-2.5 rounded-md text-sm font-semibold transition">
+    {{ icon('analytics','w-4 h-4') }}{{ t('nav_analytics') }}</a>
+  <a href="/payments" class="flex items-center gap-2 bg-card2 hover:bg-card3 border border-edge px-3 py-2.5 rounded-md text-sm font-semibold transition">
+    {{ icon('wallet','w-4 h-4') }}{{ t('nav_payments') }}</a>
+  <a href="/export/all" class="flex items-center gap-2 bg-accent text-bg px-3 py-2.5 rounded-md text-sm font-semibold transition">
     {{ icon('download','w-4 h-4') }}{{ t('export_all') }}</a>
-  <a href="/settings" class="flex items-center gap-2 bg-card2 hover:bg-card3 border border-edge px-4 py-2.5 rounded-lg text-sm transition">
-    {{ icon('settings','w-4 h-4') }}{{ t('settings') }}</a>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-const _c = getComputedStyle(document.documentElement);
-const AXIS = 'rgb(' + _c.getPropertyValue('--dim').trim() + ')';
-const GRID = 'rgb(' + _c.getPropertyValue('--edge').trim() + ' / .5)';
-const opts = { plugins:{legend:{display:false}}, scales:{
-  x:{ticks:{color:AXIS,font:{size:10}},grid:{display:false}},
-  y:{ticks:{color:AXIS,font:{size:10}},grid:{color:GRID},beginAtZero:true}}};
-function mk(id,type,data,color){ new Chart(document.getElementById(id),{type,
-  data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:color,borderColor:color,tension:.35,borderRadius:6,maxBarThickness:38,categoryPercentage:.6,barPercentage:.7,pointRadius:type==='line'?3:0,borderWidth:type==='line'?2.5:0}]},options:opts});}
-mk('attChart','line',{{ att_chart|tojson }},'#5FB0DE');
-mk('revChart','bar',{{ rev_chart|tojson }},'#1A9B4F');
-mk('grpChart','bar',{{ grp_chart|tojson }},'#5FB0DE');
-
 const CONFIRM_REJECT = {{ t('confirm_reject')|tojson }};
 async function approvePlayer(id) {
   const r = await fetch(`/api/players/${id}/approve`, {method:'POST'});
@@ -172,7 +130,6 @@ async function rejectPlayer(id) {
 function removeCard(id) {
   const el = document.getElementById('pending-' + id);
   if (el) el.remove();
-  // if that was the last pending card, reload so the section header disappears
   if (!document.querySelector('[id^="pending-"]')) location.reload();
 }
 </script>

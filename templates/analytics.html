@@ -62,7 +62,27 @@
 </div>
 {% endif %}
 
+<!-- finance -->
+<h2 class="flex items-center gap-2 font-bold mb-2 text-ink"><span class="text-accent">{{ icon('wallet','w-4 h-4') }}</span>{{ t('finance_title') }}
+  <a href="/finance" class="text-xs text-accent font-semibold ms-auto">{{ t('nav_finance') }} →</a></h2>
+<div class="grid grid-cols-2 gap-2 mb-3">
+  <div class="kpi kpi-ok bg-card rounded-lg p-3 border border-edge"><div class="label-xs mb-0.5">{{ t('fin_revenue') }}</div><div class="text-lg font-extrabold num text-ok">{{ fin.revenue }} JD</div></div>
+  <div class="kpi kpi-bad bg-card rounded-lg p-3 border border-edge"><div class="label-xs mb-0.5">{{ t('fin_expenses') }}</div><div class="text-lg font-extrabold num text-bad">{{ fin.expenses }} JD</div></div>
+  <div class="kpi {{ 'kpi-ok' if fin.profit >= 0 else 'kpi-bad' }} bg-card rounded-lg p-3 border border-edge"><div class="label-xs mb-0.5">{{ t('fin_profit') }}</div><div class="text-lg font-extrabold num {{ 'text-ok' if fin.profit >= 0 else 'text-bad' }}">{{ fin.profit }} JD</div></div>
+  <div class="kpi bg-card rounded-lg p-3 border border-edge"><div class="label-xs mb-0.5">{{ t('fin_margin') }}</div><div class="text-lg font-extrabold num">{{ fin.margin if fin.margin is not none else '—' }}{% if fin.margin is not none %}%{% endif %}</div></div>
+</div>
+<div class="bg-card rounded-xl p-4 border border-edge mb-6">
+  <div class="flex items-center gap-4 mb-2">
+    <div class="label-xs">{{ t('an_chart_finance') }}</div>
+    <span class="text-[11px] flex items-center gap-1 text-ok"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#1A9B4F"></span>{{ t('fin_revenue') }}</span>
+    <span class="text-[11px] flex items-center gap-1 text-bad"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#DC3830"></span>{{ t('fin_expenses') }}</span>
+    <span class="text-[11px] flex items-center gap-1 text-accent"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#5FB0DE"></span>{{ t('fin_profit') }}</span>
+  </div>
+  <canvas id="finChart" height="140"></canvas>
+</div>
+
 <!-- charts -->
+<h2 class="font-bold mb-2 text-ink">{{ t('charts') }}</h2>
 <div class="space-y-3 mb-6">
   <div class="bg-card rounded-xl p-4 border border-edge">
     <div class="label-xs mb-2">{{ t('an_chart_rate') }}</div>
@@ -109,5 +129,17 @@ function mk(id,type,data,color,max){
 mk('rateChart','line',{{ att_chart|tojson }},'#5FB0DE',100);
 mk('revChart','bar',{{ rev_chart|tojson }},'#1A9B4F');
 mk('newChart','bar',{{ new_chart|tojson }},'#5FB0DE');
+
+// grouped revenue vs expenses vs profit
+const F = {{ fin_months|tojson }};
+new Chart(document.getElementById('finChart'), { type:'bar',
+  data:{ labels:F.map(f=>f.d), datasets:[
+    {label:'Revenue', data:F.map(f=>f.rev), backgroundColor:'#1A9B4F', borderRadius:5, maxBarThickness:16},
+    {label:'Expenses', data:F.map(f=>f.exp), backgroundColor:'#DC3830', borderRadius:5, maxBarThickness:16},
+    {label:'Profit', data:F.map(f=>f.profit), backgroundColor:'#5FB0DE', borderRadius:5, maxBarThickness:16},
+  ]},
+  options:{ plugins:{legend:{display:false}}, scales:{
+    x:{ticks:{color:AXIS,font:{size:10}},grid:{display:false}},
+    y:{ticks:{color:AXIS,font:{size:10}},grid:{color:GRID}}}}});
 </script>
 {% endblock %}

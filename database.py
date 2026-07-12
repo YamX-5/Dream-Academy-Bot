@@ -100,6 +100,28 @@ CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     data TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS coaches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT DEFAULT '',
+    salary_type TEXT DEFAULT 'monthly',    -- monthly / session
+    salary_amount REAL DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    join_date TEXT
+);
+CREATE TABLE IF NOT EXISTS coach_attendance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    coach_id INTEGER NOT NULL REFERENCES coaches(id),
+    session_date TEXT NOT NULL,
+    UNIQUE(coach_id, session_date)
+);
+CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    category TEXT DEFAULT 'other',
+    amount REAL NOT NULL,
+    note TEXT DEFAULT ''
+);
 """
 
 
@@ -349,6 +371,41 @@ def month_attendance_rate(con, month=None):
         "WHERE session_date LIKE ?", (month + "%",)).fetchone()
     p, a = (row["p"] or 0), (row["a"] or 0)
     return round(p * 100 / (p + a)) if (p + a) else None
+
+
+# ---------- coaches & finance ----------
+
+def coach_month_sessions(con, coach_id, month=None):
+    month = month or date.today().strftime("%Y-%m")
+    return con.execute(
+        "SELECT COUNT(*) c FROM coach_attendance WHERE coach_id=? AND session_date LIKE ?",
+        (coach_id, month + "%")).fetchone()["c"]
+
+
+def coach_month_cost(con, coach, month=None):
+    """What an active coach costs this month: monthly = fixed; session = sessions × rate."""
+    if not coach["active"]:
+        return 0
+    if coach["salary_type"] == "session":
+        return coach_month_sessions(con, coach["id"], month) * (coach["salary_amount"] or 0)
+    return coach["salary_amount"] or 0
+
+
+def finance(con, month=None):
+    """Revenue, expenses (coach salaries + other), profit, gross margin for a month."""
+    month = month or date.today().strftime("%Y-%m")
+    revenue = con.execute(
+        "SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?", (month + "%",)).fetchone()["s"]
+    salaries = 0
+    for c in con.execute("SELECT * FROM coaches WHERE active=1").fetchall():
+        salaries += coach_month_cost(con, c, month)
+    other = con.execute(
+        "SELECT COALESCE(SUM(amount),0) s FROM expenses WHERE date LIKE ?", (month + "%",)).fetchone()["s"]
+    expenses = salaries + other
+    profit = revenue - expenses
+    margin = round(profit * 100 / revenue) if revenue else None
+    return {"revenue": revenue, "salaries": salaries, "other": other,
+            "expenses": expenses, "profit": profit, "margin": margin}
 
 
 def add_pending_player(con, full_name, group_id, guardian_phone="", gender="M",
