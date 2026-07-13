@@ -38,7 +38,7 @@ app.secret_key = "dream-academy-local-secret-key-2026"
 app.json.ensure_ascii = False
 
 # bump this string whenever the UI changes so you can confirm a fresh load
-BUILD = "v9 · 2026-07-11"
+BUILD = "v10 · 2026-07-11"
 
 
 @app.after_request
@@ -477,6 +477,46 @@ def api_reject(pid):
     return jsonify({"ok": True})
 
 
+@app.route("/players/<int:pid>/delete", methods=["POST"])
+@require_role("admin")
+def player_delete(pid):
+    con = db.get_db()
+    db.delete_player(con, pid)
+    con.close()
+    return redirect(url_for("players_page"))
+
+
+@app.route("/subscriptions/<int:sid>/edit", methods=["POST"])
+@require_role("admin")
+def subscription_edit(sid):
+    f = request.form
+    con = db.get_db()
+    sub = con.execute("SELECT player_id FROM subscriptions WHERE id=?", (sid,)).fetchone()
+    if sub:
+        db.update_subscription(
+            con, sid,
+            start_date=(f.get("start_date") or None),
+            sessions_total=(f.get("sessions_total") or None),
+            sessions_used=(f.get("sessions_used") or None),
+            price=(f.get("price") or None),
+            expiry_date=(f.get("expiry_date") or None),
+            status=(f.get("status") or None))
+    pid = sub["player_id"] if sub else None
+    con.close()
+    return redirect(url_for("player_card", pid=pid) if pid else url_for("players_page"))
+
+
+@app.route("/subscriptions/<int:sid>/delete", methods=["POST"])
+@require_role("admin")
+def subscription_delete(sid):
+    con = db.get_db()
+    sub = con.execute("SELECT player_id FROM subscriptions WHERE id=?", (sid,)).fetchone()
+    pid = sub["player_id"] if sub else None
+    db.delete_subscription(con, sid, drop_payments=bool(request.form.get("drop_payments")))
+    con.close()
+    return redirect(url_for("player_card", pid=pid) if pid else url_for("players_page"))
+
+
 # ---------------- attendance ----------------
 
 @app.route("/attendance")
@@ -557,7 +597,7 @@ def api_attendance_mark():
     info = player_sub_info(con, p)
     con.close()
     return jsonify({"ok": True, "status": result["status"], "unpaid": result["unpaid"],
-                    "left": info["left"], "paid": info["active"]})
+                    "trial": result.get("trial", False), "left": info["left"], "paid": info["active"]})
 
 
 @app.route("/api/attendance/mark-all-present", methods=["POST"])

@@ -77,8 +77,16 @@
       <input type="checkbox" name="trial_used" {% if player and player.trial_used %}checked{% endif %} class="accent-accent"> {{ t('trial_used') }}
     </label>
   </div>
+  <div class="text-[11px] text-faint -mt-1">{{ t('trial_hint') }}</div>
   <button class="w-full bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('save') }}</button>
 </form>
+{% if player %}
+<form method="post" action="/players/{{ player.id }}/delete" class="mt-4"
+      onsubmit="return confirm({{ t('confirm_delete_player')|tojson }})">
+  <button class="w-full bg-bad/10 hover:bg-bad/20 text-bad border border-bad/40 font-semibold py-2.5 rounded-lg text-sm transition">
+    {{ t('delete_player') }}</button>
+</form>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

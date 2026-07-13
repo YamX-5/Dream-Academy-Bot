@@ -75,12 +75,42 @@
 <h2 class="label-xs mb-2">{{ t('subscriptions') }}</h2>
 <div class="bg-card rounded-lg border border-edge mb-5 divide-y divide-edge2">
   {% for s in subs %}
-  <div class="px-4 py-2.5 flex justify-between text-sm">
-    <div dir="ltr" class="num">{{ s.start_date }} → {{ s.expiry_date }}</div>
-    <div class="text-dim num">{{ s.sessions_used }}/{{ s.sessions_total }} ·
-      <span class="{{ 'text-ok' if s.status=='active' else 'text-dim' }}">{{ t('sub_' ~ s.status) }}</span>
+  <details>
+    <summary class="px-4 py-2.5 flex justify-between items-center text-sm cursor-pointer select-none">
+      <div dir="ltr" class="num">{{ s.start_date }} → {{ s.expiry_date }}</div>
+      <div class="flex items-center gap-2 num">
+        <span class="text-dim">{{ s.sessions_used }}/{{ s.sessions_total }}</span>
+        <span class="{{ 'text-ok' if s.status=='active' else 'text-dim' }}">{{ t('sub_' ~ s.status) }}</span>
+        <span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span>
+      </div>
+    </summary>
+    <div class="px-4 pb-3 pt-1 border-t border-edge2">
+      <form method="post" action="/subscriptions/{{ s.id }}/edit" class="grid grid-cols-2 gap-2 text-sm">
+        <div><label class="label-xs">{{ t('sub_start') }}</label>
+          <input name="start_date" type="date" value="{{ s.start_date }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
+        <div><label class="label-xs">{{ t('expires') }}</label>
+          <input name="expiry_date" type="date" value="{{ s.expiry_date }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
+        <div><label class="label-xs">{{ t('sub_used') }}</label>
+          <input name="sessions_used" type="number" value="{{ s.sessions_used }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
+        <div><label class="label-xs">{{ t('sessions_count') }}</label>
+          <input name="sessions_total" type="number" value="{{ s.sessions_total }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
+        <div><label class="label-xs">{{ t('amount') }}</label>
+          <input name="price" type="number" step="0.5" value="{{ s.price }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
+        <div><label class="label-xs">{{ t('status') }}</label>
+          <select name="status" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 focus:border-accent outline-none">
+            <option value="active" {% if s.status=='active' %}selected{% endif %}>{{ t('sub_active') }}</option>
+            <option value="expired" {% if s.status=='expired' %}selected{% endif %}>{{ t('sub_expired') }}</option>
+            <option value="finished" {% if s.status=='finished' %}selected{% endif %}>{{ t('sub_finished') }}</option>
+          </select></div>
+        <button class="col-span-2 bg-accent text-bg font-semibold rounded-md py-2 mt-1">{{ t('save') }}</button>
+      </form>
+      <form method="post" action="/subscriptions/{{ s.id }}/delete" class="text-center mt-2"
+            onsubmit="return confirm({{ t('confirm_delete_sub')|tojson }})">
+        <input type="hidden" name="drop_payments" value="1">
+        <button class="text-bad text-xs font-medium">{{ t('delete_sub') }}</button>
+      </form>
     </div>
-  </div>
+  </details>
   {% else %}<div class="px-4 py-3 text-dim text-sm">{{ t('no_subs') }}</div>{% endfor %}
 </div>
 
@@ -109,6 +139,7 @@
       {{ 'text-ok' if a.status=='present' else ('text-warn' if a.status=='excused' else 'text-dim') }}">
       {{ icon('check','w-3.5 h-3.5') if a.status=='present' else (icon('minus','w-3.5 h-3.5') if a.status=='excused' else icon('x','w-3.5 h-3.5')) }}
       {{ t('att_' ~ a.status) }}
+      {% if 'trial' in a.keys() and a.trial %}<span class="pill pill-sky">{{ t('trial_tag') }}</span>{% endif %}
       {% if a.unpaid %}<span class="text-bad text-xs">· {{ t('unpaid_tag') }}</span>{% endif %}</div>
   </div>
   {% else %}<div class="px-4 py-3 text-dim text-sm">{{ t('no_att') }}</div>{% endfor %}

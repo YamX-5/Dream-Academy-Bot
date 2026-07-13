@@ -152,6 +152,9 @@ def _migrate(con):
     cols = {r["name"] for r in con.execute("PRAGMA table_info(players)").fetchall()}
     if "added_by" not in cols:
         con.execute("ALTER TABLE players ADD COLUMN added_by TEXT DEFAULT ''")
+    acols = {r["name"] for r in con.execute("PRAGMA table_info(attendance)").fetchall()}
+    if "trial" not in acols:
+        con.execute("ALTER TABLE attendance ADD COLUMN trial INTEGER DEFAULT 0")
 
 
 def get_settings():
@@ -240,6 +243,55 @@ def create_subscription(con, player_id, start_date, price=None, sessions_total=N
     return sub_id, receipt
 
 
+def update_subscription(con, sub_id, start_date=None, sessions_total=None, sessions_used=None,
+                        price=None, expiry_date=None, status=None):
+    """Edit a subscription (fix a wrong one). If start_date changes and no explicit
+    expiry is given, recompute expiry = start + expiry_days."""
+    sub = con.execute("SELECT * FROM subscriptions WHERE id=?", (sub_id,)).fetchone()
+    if not sub:
+        return
+    st = get_settings()
+    start_date = start_date or sub["start_date"]
+    sessions_total = int(sessions_total if sessions_total is not None else sub["sessions_total"])
+    sessions_used = int(sessions_used if sessions_used is not None else sub["sessions_used"])
+    price = float(price if price is not None else sub["price"])
+    if expiry_date:
+        expiry = expiry_date
+    elif start_date != sub["start_date"]:
+        expiry = (date.fromisoformat(start_date) + timedelta(days=int(st["expiry_days"]))).isoformat()
+    else:
+        expiry = sub["expiry_date"]
+    status = status or sub["status"]
+    # if only one active allowed and we're activating this one, finish the others
+    if status == "active":
+        con.execute("UPDATE subscriptions SET status='finished' WHERE player_id=? AND id!=? AND status='active'",
+                    (sub["player_id"], sub_id))
+    con.execute(
+        "UPDATE subscriptions SET start_date=?, sessions_total=?, sessions_used=?, price=?, expiry_date=?, status=? WHERE id=?",
+        (start_date, sessions_total, sessions_used, price, expiry, status, sub_id))
+    con.commit()
+
+
+def delete_subscription(con, sub_id, drop_payments=True):
+    """Delete a subscription (e.g. added by mistake). Optionally remove its payments
+    so revenue isn't inflated by the false entry."""
+    if drop_payments:
+        con.execute("DELETE FROM payments WHERE subscription_id=?", (sub_id,))
+    else:
+        con.execute("UPDATE payments SET subscription_id=NULL WHERE subscription_id=?", (sub_id,))
+    con.execute("DELETE FROM subscriptions WHERE id=?", (sub_id,))
+    con.commit()
+
+
+def delete_player(con, player_id):
+    """Permanently remove a player and everything linked to them."""
+    con.execute("DELETE FROM attendance WHERE player_id=?", (player_id,))
+    con.execute("DELETE FROM payments WHERE player_id=?", (player_id,))
+    con.execute("DELETE FROM subscriptions WHERE player_id=?", (player_id,))
+    con.execute("DELETE FROM players WHERE id=?", (player_id,))
+    con.commit()
+
+
 def mark_attendance(con, player_id, session_date, group_id, status, marked_by=""):
     """Set/update attendance and manage session deduction. Returns dict summary."""
     st = get_settings()
@@ -260,6 +312,9 @@ def mark_attendance(con, player_id, session_date, group_id, status, marked_by=""
             s2 = con.execute("SELECT * FROM subscriptions WHERE id=?", (sub["id"],)).fetchone()
             if s2["status"] == "finished" and s2["sessions_used"] < s2["sessions_total"] and today_str() <= s2["expiry_date"]:
                 con.execute("UPDATE subscriptions SET status='active' WHERE id=?", (sub["id"],))
+    # if the existing mark had consumed the free trial, give it back
+    if existing and ("trial" in existing.keys()) and existing["trial"]:
+        con.execute("UPDATE players SET trial_used=0 WHERE id=?", (player_id,))
 
     if status is None or status == "none":
         # clear the mark entirely
@@ -271,6 +326,7 @@ def mark_attendance(con, player_id, session_date, group_id, status, marked_by=""
     deduct = status == "present" or (status == "absent" and st.get("deduct_on_absence"))
     unpaid = 0
     deducted = 0
+    trial = 0
     if deduct:
         sub = get_active_subscription(con, player_id)
         if sub:
@@ -279,22 +335,30 @@ def mark_attendance(con, player_id, session_date, group_id, status, marked_by=""
             refresh_subscription_status(con, s2)
             deducted = 1
         elif status == "present":
-            unpaid = 1
+            # free trial only for a brand-new player (no subscription ever) who hasn't used it
+            player = con.execute("SELECT trial_used FROM players WHERE id=?", (player_id,)).fetchone()
+            ever_subbed = con.execute(
+                "SELECT 1 FROM subscriptions WHERE player_id=? LIMIT 1", (player_id,)).fetchone()
+            if player and not player["trial_used"] and not ever_subbed:
+                con.execute("UPDATE players SET trial_used=1 WHERE id=?", (player_id,))
+                trial = 1          # free first session — not unpaid
+            else:
+                unpaid = 1
 
     now = datetime.now().isoformat(timespec="seconds")
     if existing:
         con.execute(
-            "UPDATE attendance SET status=?, group_id=?, marked_by=?, marked_at=?, deducted=?, unpaid=? WHERE id=?",
-            (status, group_id, marked_by, now, deducted, unpaid, existing["id"]),
+            "UPDATE attendance SET status=?, group_id=?, marked_by=?, marked_at=?, deducted=?, unpaid=?, trial=? WHERE id=?",
+            (status, group_id, marked_by, now, deducted, unpaid, trial, existing["id"]),
         )
     else:
         con.execute(
-            "INSERT INTO attendance (player_id,session_date,group_id,status,marked_by,marked_at,deducted,unpaid) "
-            "VALUES (?,?,?,?,?,?,?,?)",
-            (player_id, session_date, group_id, status, marked_by, now, deducted, unpaid),
+            "INSERT INTO attendance (player_id,session_date,group_id,status,marked_by,marked_at,deducted,unpaid,trial) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (player_id, session_date, group_id, status, marked_by, now, deducted, unpaid, trial),
         )
     con.commit()
-    return {"status": status, "unpaid": bool(unpaid)}
+    return {"status": status, "unpaid": bool(unpaid), "trial": bool(trial)}
 
 
 def freeze_player(con, player_id):
