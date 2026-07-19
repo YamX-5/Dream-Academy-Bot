@@ -38,7 +38,7 @@ app.secret_key = "dream-academy-local-secret-key-2026"
 app.json.ensure_ascii = False
 
 # bump this string whenever the UI changes so you can confirm a fresh load
-BUILD = "v10 · 2026-07-11"
+BUILD = "v11 · 2026-07-19"
 
 
 @app.after_request
@@ -161,6 +161,28 @@ def inject_globals():
 
 
 # ---------------- helpers ----------------
+
+def _shift_month(d, delta):
+    y = d.year + (d.month - 1 + delta) // 12
+    m = (d.month - 1 + delta) % 12 + 1
+    return date(y, m, 1)
+
+
+def month_options(con=None, back=15, fwd=2):
+    """Every recent month is selectable (not just months that already have data),
+    plus any historical month that does have records."""
+    base = date.today().replace(day=1)
+    opts = {_shift_month(base, i).strftime("%Y-%m") for i in range(-back, fwd + 1)}
+    if con is not None:
+        for table in ("payments", "expenses"):
+            try:
+                for r in con.execute(f"SELECT DISTINCT substr(date,1,7) m FROM {table}").fetchall():
+                    if r["m"]:
+                        opts.add(r["m"])
+            except Exception:
+                pass
+    return sorted(opts, reverse=True)
+
 
 def jordan_wa_number(phone):
     """07XXXXXXXX -> 9627XXXXXXXX for wa.me links."""
@@ -369,12 +391,23 @@ def player_form(pid=None):
                 "group_id,join_date,notes,status,trial_used) VALUES (?,?,?,?,?,?,?,?,?,?,?)", vals)
             con.commit()
             new_id = cur.lastrowid
+            # a new player normally means they just paid — start their subscription
+            if f.get("create_sub"):
+                db.create_subscription(
+                    con, new_id,
+                    f.get("sub_start") or f.get("join_date") or date.today().isoformat(),
+                    price=(f.get("sub_price") or None),
+                    sessions_total=(f.get("sub_sessions") or None),
+                    method=(f.get("sub_method") or "cash"),
+                    amount=(f.get("sub_price") or None))
+                con.commit()
             con.close()
             return redirect(url_for("player_card", pid=new_id))
     groups = con.execute("SELECT * FROM groups").fetchall()
+    st = db.get_settings()
     con.close()
     return render_template("player_form.html", player=player, groups=groups, error=error,
-                           today=date.today().isoformat())
+                           settings=st, today=date.today().isoformat())
 
 
 @app.route("/api/suggest-group")
@@ -403,6 +436,10 @@ def player_card(pid):
     att = con.execute(
         "SELECT * FROM attendance WHERE player_id=? ORDER BY session_date DESC LIMIT 30", (pid,)).fetchall()
     att_stats = db.attendance_rate(con, pid)
+    trial_row = con.execute(
+        "SELECT session_date FROM attendance WHERE player_id=? AND trial=1 ORDER BY session_date LIMIT 1",
+        (pid,)).fetchone()
+    trial_date = trial_row["session_date"] if trial_row else None
     msg = render_template_msg(st["template_renewal"], p["full_name"], info["left"], st["monthly_price"])
     wa = wa_link(p["guardian_phone"] or p["phone"], msg)
     # early-renewal option: day after previous expiry
@@ -412,7 +449,7 @@ def player_card(pid):
     con.close()
     return render_template("player_card.html", p=p, info=info, subs=subs, pays=pays, att=att,
                            att_stats=att_stats, wa=wa, settings=st, prev_expiry=prev_expiry,
-                           today=date.today().isoformat())
+                           trial_date=trial_date, today=date.today().isoformat())
 
 
 @app.route("/api/players/<int:pid>/renew", methods=["POST"])
@@ -504,6 +541,38 @@ def subscription_edit(sid):
     pid = sub["player_id"] if sub else None
     con.close()
     return redirect(url_for("player_card", pid=pid) if pid else url_for("players_page"))
+
+
+@app.route("/payments/<int:pay_id>/edit", methods=["POST"])
+@require_role("admin")
+def payment_edit(pay_id):
+    """Fix a payment recorded with the wrong amount / method / date."""
+    f = request.form
+    con = db.get_db()
+    pay = con.execute("SELECT * FROM payments WHERE id=?", (pay_id,)).fetchone()
+    if pay:
+        amount = float(f.get("amount") or pay["amount"])
+        method = (f.get("method") or pay["method"]).strip()
+        pdate = (f.get("date") or pay["date"]).strip()
+        note = (f.get("note") if f.get("note") is not None else pay["note"]).strip()
+        con.execute("UPDATE payments SET amount=?, method=?, date=?, note=? WHERE id=?",
+                    (amount, method, pdate, note, pay_id))
+        con.commit()
+    pid = pay["player_id"] if pay else None
+    con.close()
+    return redirect(request.form.get("back") or (url_for("player_card", pid=pid) if pid else url_for("payments_page")))
+
+
+@app.route("/payments/<int:pay_id>/delete", methods=["POST"])
+@require_role("admin")
+def payment_delete(pay_id):
+    con = db.get_db()
+    pay = con.execute("SELECT player_id FROM payments WHERE id=?", (pay_id,)).fetchone()
+    pid = pay["player_id"] if pay else None
+    con.execute("DELETE FROM payments WHERE id=?", (pay_id,))
+    con.commit()
+    con.close()
+    return redirect(request.form.get("back") or (url_for("player_card", pid=pid) if pid else url_for("payments_page")))
 
 
 @app.route("/subscriptions/<int:sid>/delete", methods=["POST"])
@@ -665,8 +734,7 @@ def payments_page():
     sql += " ORDER BY pm.date DESC, pm.id DESC"
     rows = con.execute(sql, args).fetchall()
     total = sum(r["amount"] for r in rows)
-    months = [r["m"] for r in con.execute(
-        "SELECT DISTINCT substr(date,1,7) m FROM payments ORDER BY m DESC").fetchall()]
+    months = month_options(con)
     if month not in months:
         months.insert(0, month)
     con.close()
@@ -981,9 +1049,7 @@ def finance_page():
                         "present_today": bool(present_today)})
     expenses = con.execute(
         "SELECT * FROM expenses WHERE date LIKE ? ORDER BY date DESC, id DESC", (month + "%",)).fetchall()
-    months = [r["m"] for r in con.execute(
-        "SELECT DISTINCT substr(date,1,7) m FROM payments UNION SELECT DISTINCT substr(date,1,7) FROM expenses "
-        "ORDER BY m DESC").fetchall()]
+    months = month_options(con)
     if month not in months:
         months.insert(0, month)
     con.close()

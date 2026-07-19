@@ -41,6 +41,19 @@
     <div class="flex items-center gap-2 font-semibold text-bad">{{ icon('alert','w-4 h-4') }}{{ t('no_active_sub') }}</div>
     {% if info.sub %}<div class="text-xs text-dim mt-1 num">{{ t('last_sub') }}: {{ info.sub.start_date }} ({{ t('sub_' ~ info.sub.status) }})</div>{% endif %}
   {% endif %}
+  <!-- trial status -->
+  <div class="flex items-center gap-2 mt-3 pt-3 border-t border-edge2 text-xs">
+    {% if trial_date %}
+      <span class="pill pill-sky">{{ t('trial_tag') }}</span>
+      <span class="text-dim num">{{ t('trial_used_on', d=trial_date) }}</span>
+    {% elif p.trial_used %}
+      <span class="pill pill-muted">{{ t('trial_tag') }}</span>
+      <span class="text-dim">{{ t('trial_marked_used') }}</span>
+    {% else %}
+      <span class="pill pill-ok">{{ t('trial_tag') }}</span>
+      <span class="text-dim">{{ t('trial_available') }}</span>
+    {% endif %}
+  </div>
 </div>
 
 <div class="grid grid-cols-3 gap-2 mb-6 text-sm">
@@ -65,10 +78,36 @@
 <h2 class="label-xs mb-2">{{ t('payments') }}</h2>
 <div class="bg-card rounded-lg border border-edge mb-5 divide-y divide-edge2">
   {% for pay in pays %}
-  <div class="px-4 py-2.5 flex justify-between items-center text-sm">
-    <div><span class="font-semibold num">{{ pay.amount }} JD</span> <span class="text-dim">· {{ t(pay.method) if pay.method in ['cash','cliq','other'] else pay.method }}</span></div>
-    <div class="text-dim num">{{ pay.date }} · <a class="text-accent hover:underline" href="/receipt/{{ pay.id }}">{{ pay.receipt_no }}</a></div>
-  </div>
+  <details>
+    <summary class="px-4 py-2.5 flex justify-between items-center text-sm cursor-pointer select-none">
+      <div><span class="font-semibold num">{{ pay.amount }} JD</span> <span class="text-dim">· {{ t(pay.method) if pay.method in ['cash','cliq','other'] else pay.method }}</span></div>
+      <div class="text-dim num flex items-center gap-2">{{ pay.date }}
+        <span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span></div>
+    </summary>
+    <div class="px-4 pb-3 pt-1 border-t border-edge2">
+      <form method="post" action="/payments/{{ pay.id }}/edit" class="grid grid-cols-3 gap-2 text-sm">
+        <div><label class="label-xs">{{ t('amount') }}</label>
+          <input name="amount" type="number" step="0.5" value="{{ pay.amount }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
+        <div><label class="label-xs">{{ t('method') }}</label>
+          <select name="method" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 focus:border-accent outline-none">
+            <option value="cash" {% if pay.method=='cash' %}selected{% endif %}>{{ t('cash') }}</option>
+            <option value="cliq" {% if pay.method=='cliq' %}selected{% endif %}>{{ t('cliq') }}</option>
+            <option value="other" {% if pay.method=='other' %}selected{% endif %}>{{ t('other') }}</option>
+          </select></div>
+        <div><label class="label-xs">{{ t('date') }}</label>
+          <input name="date" type="date" value="{{ pay.date }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
+        <div class="col-span-3"><label class="label-xs">{{ t('note') }}</label>
+          <input name="note" value="{{ pay.note }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 focus:border-accent outline-none"></div>
+        <button class="col-span-3 bg-accent text-bg font-semibold rounded-md py-2 mt-1">{{ t('save') }}</button>
+      </form>
+      <div class="flex items-center justify-between mt-2">
+        <a class="text-accent text-xs hover:underline" href="/receipt/{{ pay.id }}">{{ pay.receipt_no }}</a>
+        <form method="post" action="/payments/{{ pay.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_payment')|tojson }})">
+          <button class="text-bad text-xs font-medium">{{ t('delete_payment') }}</button>
+        </form>
+      </div>
+    </div>
+  </details>
   {% else %}<div class="px-4 py-3 text-dim text-sm">{{ t('no_payments') }}</div>{% endfor %}
 </div>
 

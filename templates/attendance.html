@@ -45,20 +45,23 @@
   <option value=""></option>{% for g in groups %}<option value="{{ g.id }}">{{ g.id }}</option>{% endfor %}
 </select>
 
-<!-- date bar: auto-today, step with arrows, tap centre to jump -->
-<div class="flex items-stretch gap-2 mb-3">
-  <button id="prevDay" aria-label="previous day" class="bg-card border border-edge rounded-lg px-3 flex items-center justify-center text-dim hover:text-accent hover:border-accent/50 transition">
-    <svg class="w-5 h-5 rtl-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-  </button>
-  <button id="dateBtn" class="flex-1 bg-card border border-edge rounded-lg px-3 py-2.5 text-center relative hover:border-accent/50 transition">
-    <div id="dateMain" class="font-semibold leading-tight">—</div>
-    <div id="dateSub" class="text-[11px] text-dim leading-tight"></div>
-    <input id="sdate" type="date" value="{{ default_date }}" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer" aria-label="pick date" />
-  </button>
-  <button id="nextDay" aria-label="next day" class="bg-card border border-edge rounded-lg px-3 flex items-center justify-center text-dim hover:text-accent hover:border-accent/50 transition">
-    <svg class="w-5 h-5 rtl-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-  </button>
-  <button id="todayBtn" class="hidden bg-accent/15 border border-accent/50 text-accent rounded-lg px-3 text-sm font-semibold transition">{{ t('today') }}</button>
+<!-- date bar: real native date input (no invisible overlay) + day arrows -->
+<div class="mb-3">
+  <div class="flex items-stretch gap-2">
+    <button type="button" id="prevDay" aria-label="previous day" class="bg-card border border-edge rounded-lg px-3 flex items-center justify-center text-dim hover:text-accent hover:border-accent/50 transition">
+      <svg class="w-5 h-5 rtl-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    <input id="sdate" type="date" value="{{ default_date }}" aria-label="session date"
+           class="flex-1 min-w-0 bg-card border border-edge rounded-lg px-3 py-2.5 text-center font-semibold num focus:border-accent outline-none" />
+    <button type="button" id="nextDay" aria-label="next day" class="bg-card border border-edge rounded-lg px-3 flex items-center justify-center text-dim hover:text-accent hover:border-accent/50 transition">
+      <svg class="w-5 h-5 rtl-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <button type="button" id="todayBtn" class="hidden bg-accent/15 border border-accent/50 text-accent rounded-lg px-3 text-sm font-semibold transition">{{ t('today') }}</button>
+  </div>
+  <div class="flex items-center justify-center gap-2 mt-1.5">
+    <span id="dateMain" class="text-sm font-semibold"></span>
+    <span id="dateSub" class="text-[11px] text-dim"></span>
+  </div>
 </div>
 
 <!-- live stats + actions (shown when a group is picked) -->

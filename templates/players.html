@@ -58,6 +58,7 @@
           {% if p.status=='pending' %}<span class="pill pill-warn">{{ t('pending_badge') }}</span>{% endif %}
           {% if p.status=='frozen' %}<span class="pill pill-sky">{{ t('st_frozen') }}</span>{% endif %}
           {% if p.status=='left' %}<span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}
+          {% if not p.trial_used and not info.active %}<span class="pill pill-ok">{{ t('trial_tag') }}</span>{% endif %}
         </div>
         <div class="text-[11px] mt-0.5 num {{ 'text-bad' if not info.active else ('text-warn' if info.needs_renewal else 'text-dim') }}">
           {% if info.active %}
