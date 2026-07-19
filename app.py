@@ -38,7 +38,7 @@ app.secret_key = "dream-academy-local-secret-key-2026"
 app.json.ensure_ascii = False
 
 # bump this string whenever the UI changes so you can confirm a fresh load
-BUILD = "v11 · 2026-07-19"
+BUILD = "v12 · 2026-07-19"
 
 
 @app.after_request
@@ -1032,6 +1032,10 @@ def ai_insight_rev(lang, dirn, rev, prev):
 
 # ---------------- finance: coaches, salaries, expenses, profit ----------------
 
+# preset expense categories (label comes from i18n as exp_cat_<key>)
+EXPENSE_CATEGORIES = ["court_rent", "equipment", "transport", "utilities",
+                      "maintenance", "referees", "marketing", "other"]
+
 @app.route("/finance")
 @require_role("admin")
 def finance_page():
@@ -1049,11 +1053,18 @@ def finance_page():
                         "present_today": bool(present_today)})
     expenses = con.execute(
         "SELECT * FROM expenses WHERE date LIKE ? ORDER BY date DESC, id DESC", (month + "%",)).fetchall()
+    breakdown = db.expenses_by_category(con, month)
+    # last month's expenses, so recurring ones (court rent…) can be copied in one tap
+    prev_month = _shift_month(date.fromisoformat(month + "-01"), -1).strftime("%Y-%m")
+    prev_count = con.execute("SELECT COUNT(*) c FROM expenses WHERE date LIKE ?",
+                             (prev_month + "%",)).fetchone()["c"]
     months = month_options(con)
     if month not in months:
         months.insert(0, month)
     con.close()
     return render_template("finance.html", fin=fin, coaches=coaches, expenses=expenses,
+                           breakdown=breakdown, categories=EXPENSE_CATEGORIES,
+                           prev_month=prev_month, prev_count=prev_count,
                            month=month, months=months, today=today)
 
 
@@ -1123,6 +1134,25 @@ def expenses_save():
     return redirect(url_for("finance_page", month=(f.get("date") or "")[:7] or None))
 
 
+@app.route("/expenses/<int:eid>/edit", methods=["POST"])
+@require_role("admin")
+def expenses_edit(eid):
+    """Correct an expense (wrong amount, category, date or description)."""
+    f = request.form
+    con = db.get_db()
+    e = con.execute("SELECT * FROM expenses WHERE id=?", (eid,)).fetchone()
+    if e:
+        con.execute("UPDATE expenses SET date=?, category=?, amount=?, note=? WHERE id=?",
+                    ((f.get("date") or e["date"]).strip(),
+                     (f.get("category") or e["category"] or "other").strip(),
+                     float(f.get("amount") or e["amount"]),
+                     (f.get("note") if f.get("note") is not None else e["note"]).strip(), eid))
+        con.commit()
+    month = (f.get("date") or (e["date"] if e else ""))[:7]
+    con.close()
+    return redirect(url_for("finance_page", month=month or None))
+
+
 @app.route("/expenses/<int:eid>/delete", methods=["POST"])
 @require_role("admin")
 def expenses_delete(eid):
@@ -1131,6 +1161,29 @@ def expenses_delete(eid):
     con.commit()
     con.close()
     return redirect(request.referrer or url_for("finance_page"))
+
+
+@app.route("/expenses/copy", methods=["POST"])
+@require_role("admin")
+def expenses_copy():
+    """Copy last month's expenses into this month (court rent and other regulars)."""
+    src = request.form.get("from_month")
+    dst = request.form.get("to_month")
+    if not src or not dst:
+        return redirect(url_for("finance_page"))
+    con = db.get_db()
+    rows = con.execute("SELECT * FROM expenses WHERE date LIKE ?", (src + "%",)).fetchall()
+    for r in rows:
+        day = (r["date"] or "")[8:10] or "01"
+        # clamp the day so e.g. the 31st doesn't fall outside a shorter month
+        y, m = int(dst[:4]), int(dst[5:7])
+        last_day = (_shift_month(date(y, m, 1), 1) - timedelta(days=1)).day
+        new_date = f"{dst}-{min(int(day), last_day):02d}"
+        con.execute("INSERT INTO expenses (date, category, amount, note) VALUES (?,?,?,?)",
+                    (new_date, r["category"], r["amount"], r["note"]))
+    con.commit()
+    con.close()
+    return redirect(url_for("finance_page", month=dst))
 
 
 # ---------------- excel ----------------

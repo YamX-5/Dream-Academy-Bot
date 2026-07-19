@@ -455,6 +455,17 @@ def coach_month_cost(con, coach, month=None):
     return coach["salary_amount"] or 0
 
 
+def expenses_by_category(con, month=None):
+    """Where the money went this month: [{category, total, share}] biggest first."""
+    month = month or date.today().strftime("%Y-%m")
+    rows = con.execute(
+        "SELECT COALESCE(NULLIF(category,''),'other') c, SUM(amount) s FROM expenses "
+        "WHERE date LIKE ? GROUP BY c ORDER BY s DESC", (month + "%",)).fetchall()
+    total = sum(r["s"] or 0 for r in rows)
+    return [{"category": r["c"], "total": r["s"] or 0,
+             "share": round((r["s"] or 0) * 100 / total) if total else 0} for r in rows]
+
+
 def finance(con, month=None):
     """Revenue, expenses (coach salaries + other), profit, gross margin for a month."""
     month = month or date.today().strftime("%Y-%m")

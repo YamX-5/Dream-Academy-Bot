@@ -99,22 +99,72 @@
 
 <!-- expenses -->
 <h2 class="font-bold text-ink flex items-center gap-2 mb-2"><span class="text-accent">{{ icon('wallet','w-4 h-4') }}</span>{{ t('expenses_title') }}</h2>
+
+<!-- where the money went -->
+{% if breakdown %}
+<div class="bg-card rounded-lg border border-edge p-3.5 mb-2">
+  <div class="label-xs mb-2.5">{{ t('where_money_goes') }}</div>
+  {% for b in breakdown %}
+  <div class="flex items-center gap-2.5 mb-2">
+    <div class="w-24 text-xs truncate shrink-0">{{ t('exp_cat_' ~ b.category) }}</div>
+    <div class="flex-1 h-2.5 rounded-full bg-card3 overflow-hidden">
+      <div class="h-full rounded-full" style="width: {{ b.share }}%; background:linear-gradient(90deg,rgb(var(--bad)),rgb(var(--warn)))"></div>
+    </div>
+    <div class="w-24 text-end text-xs num shrink-0">{{ b.total }} JD <span class="text-faint">{{ b.share }}%</span></div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- add expense -->
 <form method="post" action="/expenses/save" class="bg-card rounded-lg border border-edge p-3 mb-2 grid grid-cols-12 gap-2">
-  <input name="note" placeholder="{{ t('expense_note') }}" class="col-span-5 bg-bg border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
-  <input name="amount" type="number" step="0.5" required placeholder="{{ t('expense_amount') }}" class="col-span-3 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
-  <input name="date" type="date" value="{{ today }}" class="col-span-4 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
+  <select name="category" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
+    {% for c in categories %}<option value="{{ c }}">{{ t('exp_cat_' ~ c) }}</option>{% endfor %}
+  </select>
+  <input name="amount" type="number" step="0.5" required placeholder="{{ t('expense_amount') }}" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
+  <input name="note" placeholder="{{ t('expense_note') }}" class="col-span-7 bg-bg border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
+  <input name="date" type="date" value="{{ today }}" class="col-span-5 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
   <button class="col-span-12 bg-accent text-bg font-semibold rounded-md py-2 text-sm">{{ t('add_expense') }}</button>
 </form>
+
+{% if prev_count and not expenses %}
+<form method="post" action="/expenses/copy" class="mb-2">
+  <input type="hidden" name="from_month" value="{{ prev_month }}"><input type="hidden" name="to_month" value="{{ month }}">
+  <button class="w-full bg-card2 hover:bg-card3 border border-dashed border-edge rounded-md py-2 text-xs font-semibold text-accent">
+    {{ t('copy_last_month', n=prev_count, m=prev_month) }}</button>
+</form>
+{% endif %}
+
+<!-- expense list (tap to edit) -->
 <div class="bg-card rounded-lg border border-edge divide-y divide-edge2 mb-6">
   {% for e in expenses %}
-  <div class="px-3 py-2.5 flex items-center justify-between text-sm">
-    <div class="min-w-0"><div class="font-semibold truncate">{{ e.note or t('expenses_title') }}</div>
-      <div class="text-[11px] text-dim num">{{ e.date }}</div></div>
-    <div class="flex items-center gap-2 shrink-0">
-      <span class="font-bold num text-bad">-{{ e.amount }} JD</span>
-      <form method="post" action="/expenses/{{ e.id }}/delete"><button class="text-dim hover:text-bad">{{ icon('x','w-4 h-4') }}</button></form>
+  <details>
+    <summary class="px-3 py-2.5 flex items-center justify-between text-sm cursor-pointer select-none">
+      <div class="min-w-0">
+        <div class="font-semibold truncate">{{ e.note or t('exp_cat_' ~ (e.category or 'other')) }}</div>
+        <div class="text-[11px] text-dim num">{{ e.date }} · {{ t('exp_cat_' ~ (e.category or 'other')) }}</div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <span class="font-bold num text-bad">-{{ e.amount }} JD</span>
+        <span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span>
+      </div>
+    </summary>
+    <div class="px-3 pb-3 pt-1 border-t border-edge2">
+      <form method="post" action="/expenses/{{ e.id }}/edit" class="grid grid-cols-12 gap-2 text-sm">
+        <select name="category" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 focus:border-accent outline-none">
+          {% for c in categories %}<option value="{{ c }}" {% if (e.category or 'other')==c %}selected{% endif %}>{{ t('exp_cat_' ~ c) }}</option>{% endfor %}
+        </select>
+        <input name="amount" type="number" step="0.5" value="{{ e.amount }}" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 num focus:border-accent outline-none">
+        <input name="note" value="{{ e.note }}" placeholder="{{ t('expense_note') }}" class="col-span-7 bg-bg border border-edge rounded-md px-2 py-2 focus:border-accent outline-none">
+        <input name="date" type="date" value="{{ e.date }}" class="col-span-5 bg-bg border border-edge rounded-md px-2 py-2 num focus:border-accent outline-none">
+        <button class="col-span-12 bg-accent text-bg font-semibold rounded-md py-2 mt-0.5">{{ t('save') }}</button>
+      </form>
+      <form method="post" action="/expenses/{{ e.id }}/delete" class="text-center mt-2"
+            onsubmit="return confirm({{ t('confirm_delete_expense')|tojson }})">
+        <button class="text-bad text-xs font-medium">{{ t('delete_expense') }}</button>
+      </form>
     </div>
-  </div>
+  </details>
   {% else %}<div class="px-3 py-4 text-center text-dim text-sm">{{ t('no_expenses') }}</div>{% endfor %}
 </div>
 {% endblock %}

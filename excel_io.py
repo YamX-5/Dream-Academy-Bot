@@ -74,12 +74,40 @@ def export_all(con):
            [(r[0], r[1], r[2], {"present": "حاضر", "absent": "غائب", "excused": "معذور"}.get(r[3], r[3]),
              "نعم" if r[4] else "", r[5]) for r in att])
 
+    # expenses — where the money went
+    try:
+        exp = con.execute(
+            "SELECT date, COALESCE(NULLIF(category,''),'other') c, amount, note FROM expenses "
+            "ORDER BY date DESC").fetchall()
+    except Exception:
+        exp = []
+    _sheet(wb, "Expenses المصاريف",
+           ["التاريخ / Date", "البند / Category", "المبلغ / Amount (JD)", "الوصف / Description"],
+           [tuple(r) for r in exp])
+
+    # coaches & salaries
+    try:
+        coaches = con.execute(
+            "SELECT name, phone, salary_type, salary_amount, active FROM coaches ORDER BY name").fetchall()
+    except Exception:
+        coaches = []
+    _sheet(wb, "Coaches المدربين",
+           ["الاسم / Name", "الهاتف / Phone", "نوع الراتب / Salary type", "الراتب / Amount", "فعال / Active"],
+           [(r[0], r[1], r[2], r[3], "نعم" if r[4] else "لا") for r in coaches])
+
     month = date.today().strftime("%Y-%m")
+    revenue = con.execute("SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?",
+                          (month + "%",)).fetchone()["s"]
+    try:
+        other_exp = con.execute("SELECT COALESCE(SUM(amount),0) s FROM expenses WHERE date LIKE ?",
+                                (month + "%",)).fetchone()["s"]
+    except Exception:
+        other_exp = 0
     kpis = [
         ("اللاعبين الفعالين / Active players",
          con.execute("SELECT COUNT(*) c FROM players WHERE status='active'").fetchone()["c"]),
-        ("إيراد هذا الشهر / Revenue this month (JD)",
-         con.execute("SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?", (month + "%",)).fetchone()["s"]),
+        ("إيراد هذا الشهر / Revenue this month (JD)", revenue),
+        ("مصاريف هذا الشهر / Expenses this month (JD)", other_exp),
         ("اشتراكات فعالة / Active subscriptions",
          con.execute("SELECT COUNT(*) c FROM subscriptions WHERE status='active'").fetchone()["c"]),
         ("حصص غير مدفوعة / Unpaid sessions",
