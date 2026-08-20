@@ -74,7 +74,7 @@
       </select>
     </div>
     <label class="flex items-center gap-2 mt-6 text-sm">
-      <input type="checkbox" name="trial_used" {% if player and player.trial_used %}checked{% endif %} class="accent-accent"> {{ t('trial_used') }}
+      <input type="checkbox" name="trial_used" {% if (player and player.trial_used) or not player %}checked{% endif %} class="accent-accent"> {{ t('trial_used') }}
     </label>
   </div>
   <div class="text-[11px] text-faint -mt-1">{{ t('trial_hint') }}</div>

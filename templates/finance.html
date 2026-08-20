@@ -124,6 +124,9 @@
   <input name="amount" type="number" step="0.5" required placeholder="{{ t('expense_amount') }}" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
   <input name="note" placeholder="{{ t('expense_note') }}" class="col-span-7 bg-bg border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
   <input name="date" type="date" value="{{ today }}" class="col-span-5 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
+  <label class="col-span-12 flex items-center gap-2 text-xs text-dim">
+    <input type="checkbox" name="recurring"> {{ t('expense_recurring') }}
+  </label>
   <button class="col-span-12 bg-accent text-bg font-semibold rounded-md py-2 text-sm">{{ t('add_expense') }}</button>
 </form>
 
@@ -141,7 +144,8 @@
   <details>
     <summary class="px-3 py-2.5 flex items-center justify-between text-sm cursor-pointer select-none">
       <div class="min-w-0">
-        <div class="font-semibold truncate">{{ e.note or t('exp_cat_' ~ (e.category or 'other')) }}</div>
+        <div class="font-semibold truncate flex items-center gap-1.5">{{ e.note or t('exp_cat_' ~ (e.category or 'other')) }}
+          {% if 'recurring' in e.keys() and e.recurring %}<span class="pill pill-violet">{{ t('monthly_tag') }}</span>{% endif %}</div>
         <div class="text-[11px] text-dim num">{{ e.date }} · {{ t('exp_cat_' ~ (e.category or 'other')) }}</div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -157,6 +161,9 @@
         <input name="amount" type="number" step="0.5" value="{{ e.amount }}" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 num focus:border-accent outline-none">
         <input name="note" value="{{ e.note }}" placeholder="{{ t('expense_note') }}" class="col-span-7 bg-bg border border-edge rounded-md px-2 py-2 focus:border-accent outline-none">
         <input name="date" type="date" value="{{ e.date }}" class="col-span-5 bg-bg border border-edge rounded-md px-2 py-2 num focus:border-accent outline-none">
+        <label class="col-span-12 flex items-center gap-2 text-xs text-dim">
+          <input type="checkbox" name="recurring" {% if 'recurring' in e.keys() and e.recurring %}checked{% endif %}> {{ t('expense_recurring') }}
+        </label>
         <button class="col-span-12 bg-accent text-bg font-semibold rounded-md py-2 mt-0.5">{{ t('save') }}</button>
       </form>
       <form method="post" action="/expenses/{{ e.id }}/delete" class="text-center mt-2"

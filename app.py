@@ -38,7 +38,7 @@ app.secret_key = "dream-academy-local-secret-key-2026"
 app.json.ensure_ascii = False
 
 # bump this string whenever the UI changes so you can confirm a fresh load
-BUILD = "v12 · 2026-07-19"
+BUILD = "v13 · 2026-08-20"
 
 
 @app.after_request
@@ -228,10 +228,9 @@ def player_sub_info(con, player):
         ).fetchone()
         return {"active": False, "sub": dict(last) if last else None, "left": 0, "days_left": 0,
                 "needs_renewal": True}
-    left = sub["sessions_total"] - sub["sessions_used"]
-    days_left = (date.fromisoformat(sub["expiry_date"]) - date.today()).days
-    return {"active": True, "sub": dict(sub), "left": left, "days_left": days_left,
-            "needs_renewal": left <= 2 or days_left <= 5}
+    prog = db.sub_progress(con, sub)
+    return {"active": True, "sub": dict(sub), "left": prog["left"], "used": prog["used"],
+            "days_left": prog["days_left"], "needs_renewal": prog["left"] <= 2 or prog["days_left"] <= 5}
 
 
 # ---------------- pages ----------------
@@ -1051,8 +1050,8 @@ def finance_page():
                         "sessions": db.coach_month_sessions(con, c["id"], month),
                         "cost": db.coach_month_cost(con, c, month),
                         "present_today": bool(present_today)})
-    expenses = con.execute(
-        "SELECT * FROM expenses WHERE date LIKE ? ORDER BY date DESC, id DESC", (month + "%",)).fetchall()
+    expenses = db.month_expense_rows(con, month)
+    expenses = sorted(expenses, key=lambda r: (r["recurring"] if "recurring" in r.keys() else 0, r["date"]), reverse=True)
     breakdown = db.expenses_by_category(con, month)
     # last month's expenses, so recurring ones (court rent…) can be copied in one tap
     prev_month = _shift_month(date.fromisoformat(month + "-01"), -1).strftime("%Y-%m")
@@ -1126,9 +1125,10 @@ def coach_present(cid):
 def expenses_save():
     f = request.form
     con = db.get_db()
-    con.execute("INSERT INTO expenses (date, category, amount, note) VALUES (?,?,?,?)",
+    con.execute("INSERT INTO expenses (date, category, amount, note, recurring) VALUES (?,?,?,?,?)",
                 (f.get("date") or date.today().isoformat(), (f.get("category") or "other").strip(),
-                 float(f.get("amount") or 0), (f.get("note") or "").strip()))
+                 float(f.get("amount") or 0), (f.get("note") or "").strip(),
+                 1 if f.get("recurring") else 0))
     con.commit()
     con.close()
     return redirect(url_for("finance_page", month=(f.get("date") or "")[:7] or None))
@@ -1142,11 +1142,12 @@ def expenses_edit(eid):
     con = db.get_db()
     e = con.execute("SELECT * FROM expenses WHERE id=?", (eid,)).fetchone()
     if e:
-        con.execute("UPDATE expenses SET date=?, category=?, amount=?, note=? WHERE id=?",
+        con.execute("UPDATE expenses SET date=?, category=?, amount=?, note=?, recurring=? WHERE id=?",
                     ((f.get("date") or e["date"]).strip(),
                      (f.get("category") or e["category"] or "other").strip(),
                      float(f.get("amount") or e["amount"]),
-                     (f.get("note") if f.get("note") is not None else e["note"]).strip(), eid))
+                     (f.get("note") if f.get("note") is not None else e["note"]).strip(),
+                     1 if f.get("recurring") else 0, eid))
         con.commit()
     month = (f.get("date") or (e["date"] if e else ""))[:7]
     con.close()

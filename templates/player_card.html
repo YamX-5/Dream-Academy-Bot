@@ -27,7 +27,7 @@
 <div class="bg-card rounded-xl p-5 border {{ 'border-accent/50' if info.active else 'border-bad/50' }} mb-4">
   <div class="label-xs mb-2">{{ t('current_sub') }}</div>
   {% if info.active %}
-    {% set used = info.sub.sessions_used %}{% set total = info.sub.sessions_total %}
+    {% set used = info.used %}{% set total = info.sub.sessions_total %}
     <div class="flex gap-1.5 mb-3" dir="ltr">
       {%- for i in range(total) %}
       <span class="h-2 flex-1 rounded-full {{ 'bg-accent' if i < used else 'bg-card3' }}"></span>
@@ -36,6 +36,7 @@
     <div class="font-semibold num">{{ t('sub_left_expires', n=info.left) }}
       <span class="text-dim font-normal text-sm">· {{ t('expires_on', d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7], days=info.days_left) }}</span>
     </div>
+    <div class="text-[11px] text-faint mt-1">{{ t('calendar_sub_hint') }}</div>
     {% if info.needs_renewal %}<div class="flex items-center gap-1.5 text-warn text-sm mt-2">{{ icon('clock','w-4 h-4') }}{{ t('renew_soon') }}</div>{% endif %}
   {% else %}
     <div class="flex items-center gap-2 font-semibold text-bad">{{ icon('alert','w-4 h-4') }}{{ t('no_active_sub') }}</div>
@@ -127,10 +128,6 @@
       <form method="post" action="/subscriptions/{{ s.id }}/edit" class="grid grid-cols-2 gap-2 text-sm">
         <div><label class="label-xs">{{ t('sub_start') }}</label>
           <input name="start_date" type="date" value="{{ s.start_date }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
-        <div><label class="label-xs">{{ t('expires') }}</label>
-          <input name="expiry_date" type="date" value="{{ s.expiry_date }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
-        <div><label class="label-xs">{{ t('sub_used') }}</label>
-          <input name="sessions_used" type="number" value="{{ s.sessions_used }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
         <div><label class="label-xs">{{ t('sessions_count') }}</label>
           <input name="sessions_total" type="number" value="{{ s.sessions_total }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
         <div><label class="label-xs">{{ t('amount') }}</label>
@@ -141,6 +138,7 @@
             <option value="expired" {% if s.status=='expired' %}selected{% endif %}>{{ t('sub_expired') }}</option>
             <option value="finished" {% if s.status=='finished' %}selected{% endif %}>{{ t('sub_finished') }}</option>
           </select></div>
+        <div class="col-span-2 text-[11px] text-faint">{{ t('sub_expiry_auto', d=s.expiry_date) }}</div>
         <button class="col-span-2 bg-accent text-bg font-semibold rounded-md py-2 mt-1">{{ t('save') }}</button>
       </form>
       <form method="post" action="/subscriptions/{{ s.id }}/delete" class="text-center mt-2"

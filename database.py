@@ -155,6 +155,15 @@ def _migrate(con):
     acols = {r["name"] for r in con.execute("PRAGMA table_info(attendance)").fetchall()}
     if "trial" not in acols:
         con.execute("ALTER TABLE attendance ADD COLUMN trial INTEGER DEFAULT 0")
+    scols = {r["name"] for r in con.execute("PRAGMA table_info(subscriptions)").fetchall()}
+    if "paused_days" not in scols:
+        con.execute("ALTER TABLE subscriptions ADD COLUMN paused_days INTEGER DEFAULT 0")
+    try:
+        ecols = {r["name"] for r in con.execute("PRAGMA table_info(expenses)").fetchall()}
+        if ecols and "recurring" not in ecols:
+            con.execute("ALTER TABLE expenses ADD COLUMN recurring INTEGER DEFAULT 0")
+    except Exception:
+        pass
 
 
 def get_settings():
@@ -180,30 +189,81 @@ def today_str():
     return date.today().isoformat()
 
 
-def refresh_subscription_status(con, sub_row, player_frozen=False):
-    """Lazily transition active subs to finished/expired. Returns current status."""
-    status = sub_row["status"]
-    if status != "active":
-        return status
-    if sub_row["sessions_used"] >= sub_row["sessions_total"]:
-        status = "finished"
-    elif not player_frozen and today_str() > sub_row["expiry_date"]:
-        status = "expired"
-    if status != "active":
-        con.execute("UPDATE subscriptions SET status=? WHERE id=?", (status, sub_row["id"]))
-    return status
+_WD = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3,
+       "Friday": 4, "Saturday": 5, "Sunday": 6}
+
+
+def training_weekdays(settings=None):
+    settings = settings or get_settings()
+    return {_WD[d] for d in (settings.get("training_days") or []) if d in _WD}
+
+
+def scheduled_session_dates(start_iso, count, wds):
+    """The next `count` training-day dates on/after start_iso (as date objects)."""
+    if not wds or count <= 0:
+        return []
+    d = date.fromisoformat(start_iso)
+    out = []
+    for _ in range(count * 12 + 90):          # generous safety bound
+        if d.weekday() in wds:
+            out.append(d)
+            if len(out) >= count:
+                break
+        d += timedelta(days=1)
+    return out
+
+
+def sub_progress(con, sub, settings=None):
+    """Calendar-based progress for a subscription.
+
+    Sessions are the next `sessions_total` training days (Sun/Tue/Thu by default)
+    starting from start_date. One session is consumed for every such day that has
+    passed — whether or not the player attended. Freezing pauses the count via
+    subscriptions.paused_days. Returns {total, used, left, expiry, days_left, active}.
+    """
+    settings = settings or get_settings()
+    total = int(sub["sessions_total"] or 0)
+    paused = int(sub["paused_days"]) if ("paused_days" in sub.keys() and sub["paused_days"]) else 0
+    player = con.execute("SELECT frozen_at FROM players WHERE id=?", (sub["player_id"],)).fetchone()
+    frozen_at = player["frozen_at"] if player else None
+    wds = training_weekdays(settings)
+
+    if wds:
+        sched = scheduled_session_dates(sub["start_date"], total, wds)
+        base_expiry = sched[-1] if sched else date.fromisoformat(sub["expiry_date"])
+        expiry_iso = (base_expiry + timedelta(days=paused)).isoformat()
+        # count scheduled sessions that have already occurred (pause rewinds "today")
+        cutoff = (date.fromisoformat(frozen_at) if frozen_at else date.today()) - timedelta(days=paused)
+        used = max(0, min(total, sum(1 for s in sched if s <= cutoff)))
+    else:
+        # no training days configured -> fall back to the stored counter + date expiry
+        used = max(0, min(total, int(sub["sessions_used"] or 0)))
+        expiry_iso = sub["expiry_date"]
+
+    left = total - used
+    days_left = (date.fromisoformat(expiry_iso) - date.today()).days
+    active = date.today() <= date.fromisoformat(expiry_iso)
+    return {"total": total, "used": used, "left": left, "expiry": expiry_iso,
+            "days_left": days_left, "active": active}
 
 
 def get_active_subscription(con, player_id):
-    """Return the player's active subscription row (after lazy refresh), or None."""
-    player = con.execute("SELECT * FROM players WHERE id=?", (player_id,)).fetchone()
-    frozen = bool(player and player["frozen_at"])
+    """Return the player's active subscription (most recent), keeping the stored
+    sessions_used / expiry_date / status in sync with the calendar. Else None."""
+    settings = get_settings()
     subs = con.execute(
-        "SELECT * FROM subscriptions WHERE player_id=? AND status='active' ORDER BY start_date DESC",
-        (player_id,),
-    ).fetchall()
+        "SELECT * FROM subscriptions WHERE player_id=? ORDER BY start_date DESC, id DESC",
+        (player_id,)).fetchall()
     for s in subs:
-        if refresh_subscription_status(con, s, frozen) == "active":
+        prog = sub_progress(con, s, settings)
+        new_status = "active" if prog["active"] else ("finished" if prog["used"] >= prog["total"] else "expired")
+        # keep the row's stored values fresh for lists, receipts and exports
+        if (s["sessions_used"] != prog["used"] or s["expiry_date"] != prog["expiry"]
+                or (s["status"] != new_status and s["status"] != "frozen")):
+            con.execute("UPDATE subscriptions SET sessions_used=?, expiry_date=?, status=? WHERE id=?",
+                        (prog["used"], prog["expiry"], new_status, s["id"]))
+            con.commit()
+        if prog["active"]:
             return con.execute("SELECT * FROM subscriptions WHERE id=?", (s["id"],)).fetchone()
     return None
 
@@ -218,20 +278,32 @@ def next_receipt_no(con):
     return f"{prefix}{n:04d}"
 
 
+def subscription_expiry(start_date, sessions_total, settings=None):
+    """The date the subscription ends = the Nth training day from the start date.
+    Falls back to start + expiry_days if no training days are configured."""
+    settings = settings or get_settings()
+    wds = training_weekdays(settings)
+    if wds:
+        sched = scheduled_session_dates(start_date, int(sessions_total), wds)
+        if sched:
+            return sched[-1].isoformat()
+    return (date.fromisoformat(start_date) + timedelta(days=int(settings.get("expiry_days", 35)))).isoformat()
+
+
 def create_subscription(con, player_id, start_date, price=None, sessions_total=None,
                         method="cash", note="", amount=None):
     """New subscription + payment in one flow. Returns (sub_id, receipt_no)."""
     st = get_settings()
     price = float(price if price is not None else st["monthly_price"])
     sessions_total = int(sessions_total if sessions_total is not None else st["sessions_per_month"])
-    expiry = (date.fromisoformat(start_date) + timedelta(days=int(st["expiry_days"]))).isoformat()
+    expiry = subscription_expiry(start_date, sessions_total, st)
     # close any lingering active sub (one active sub max)
     con.execute(
         "UPDATE subscriptions SET status='finished' WHERE player_id=? AND status='active'", (player_id,)
     )
     cur = con.execute(
-        "INSERT INTO subscriptions (player_id,start_date,sessions_total,sessions_used,price,expiry_date,status) "
-        "VALUES (?,?,?,0,?,?,'active')",
+        "INSERT INTO subscriptions (player_id,start_date,sessions_total,sessions_used,price,expiry_date,status,paused_days) "
+        "VALUES (?,?,?,0,?,?,'active',0)",
         (player_id, start_date, sessions_total, price, expiry),
     )
     sub_id = cur.lastrowid
@@ -257,8 +329,8 @@ def update_subscription(con, sub_id, start_date=None, sessions_total=None, sessi
     price = float(price if price is not None else sub["price"])
     if expiry_date:
         expiry = expiry_date
-    elif start_date != sub["start_date"]:
-        expiry = (date.fromisoformat(start_date) + timedelta(days=int(st["expiry_days"]))).isoformat()
+    elif start_date != sub["start_date"] or sessions_total != sub["sessions_total"]:
+        expiry = subscription_expiry(start_date, sessions_total, st)
     else:
         expiry = sub["expiry_date"]
     status = status or sub["status"]
@@ -299,20 +371,9 @@ def mark_attendance(con, player_id, session_date, group_id, status, marked_by=""
         "SELECT * FROM attendance WHERE player_id=? AND session_date=?", (player_id, session_date)
     ).fetchone()
 
-    # revert previous deduction if any (we recompute from scratch)
-    if existing and existing["deducted"]:
-        # the sub that was deducted from: the most recent one with sessions_used > 0
-        sub = con.execute(
-            "SELECT * FROM subscriptions WHERE player_id=? AND sessions_used > 0 ORDER BY start_date DESC LIMIT 1",
-            (player_id,),
-        ).fetchone()
-        if sub:
-            con.execute("UPDATE subscriptions SET sessions_used = sessions_used - 1 WHERE id=?", (sub["id"],))
-            # un-finish if it was finished purely by count and not expired
-            s2 = con.execute("SELECT * FROM subscriptions WHERE id=?", (sub["id"],)).fetchone()
-            if s2["status"] == "finished" and s2["sessions_used"] < s2["sessions_total"] and today_str() <= s2["expiry_date"]:
-                con.execute("UPDATE subscriptions SET status='active' WHERE id=?", (sub["id"],))
-    # if the existing mark had consumed the free trial, give it back
+    # sessions are consumed by the calendar (Sun/Tue/Thu), NOT by attendance, so
+    # marking present/absent no longer adds or removes sessions. We only give the
+    # free trial back if an existing trial mark is being cleared/changed.
     if existing and ("trial" in existing.keys()) and existing["trial"]:
         con.execute("UPDATE players SET trial_used=0 WHERE id=?", (player_id,))
 
@@ -321,41 +382,35 @@ def mark_attendance(con, player_id, session_date, group_id, status, marked_by=""
         if existing:
             con.execute("DELETE FROM attendance WHERE id=?", (existing["id"],))
         con.commit()
-        return {"status": "none", "unpaid": False}
+        return {"status": "none", "unpaid": False, "trial": False}
 
-    deduct = status == "present" or (status == "absent" and st.get("deduct_on_absence"))
     unpaid = 0
-    deducted = 0
     trial = 0
-    if deduct:
+    if status == "present":
         sub = get_active_subscription(con, player_id)
-        if sub:
-            con.execute("UPDATE subscriptions SET sessions_used = sessions_used + 1 WHERE id=?", (sub["id"],))
-            s2 = con.execute("SELECT * FROM subscriptions WHERE id=?", (sub["id"],)).fetchone()
-            refresh_subscription_status(con, s2)
-            deducted = 1
-        elif status == "present":
-            # free trial only for a brand-new player (no subscription ever) who hasn't used it
+        if not sub:
+            # present with no active subscription: free trial once for a brand-new
+            # player (no subscription ever), otherwise flag the session as unpaid
             player = con.execute("SELECT trial_used FROM players WHERE id=?", (player_id,)).fetchone()
             ever_subbed = con.execute(
                 "SELECT 1 FROM subscriptions WHERE player_id=? LIMIT 1", (player_id,)).fetchone()
             if player and not player["trial_used"] and not ever_subbed:
                 con.execute("UPDATE players SET trial_used=1 WHERE id=?", (player_id,))
-                trial = 1          # free first session — not unpaid
+                trial = 1
             else:
                 unpaid = 1
 
     now = datetime.now().isoformat(timespec="seconds")
     if existing:
         con.execute(
-            "UPDATE attendance SET status=?, group_id=?, marked_by=?, marked_at=?, deducted=?, unpaid=?, trial=? WHERE id=?",
-            (status, group_id, marked_by, now, deducted, unpaid, trial, existing["id"]),
+            "UPDATE attendance SET status=?, group_id=?, marked_by=?, marked_at=?, deducted=0, unpaid=?, trial=? WHERE id=?",
+            (status, group_id, marked_by, now, unpaid, trial, existing["id"]),
         )
     else:
         con.execute(
             "INSERT INTO attendance (player_id,session_date,group_id,status,marked_by,marked_at,deducted,unpaid,trial) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
-            (player_id, session_date, group_id, status, marked_by, now, deducted, unpaid, trial),
+            "VALUES (?,?,?,?,?,?,0,?,?)",
+            (player_id, session_date, group_id, status, marked_by, now, unpaid, trial),
         )
     con.commit()
     return {"status": status, "unpaid": bool(unpaid), "trial": bool(trial)}
@@ -371,15 +426,14 @@ def unfreeze_player(con, player_id):
     if p and p["frozen_at"]:
         days = (date.today() - date.fromisoformat(p["frozen_at"])).days
         if days > 0:
+            # the freeze paused the calendar clock — bank the days so the remaining
+            # sessions slide forward by exactly the frozen duration
             sub = con.execute(
-                "SELECT * FROM subscriptions WHERE player_id=? AND status IN ('active','expired') "
-                "ORDER BY start_date DESC LIMIT 1", (player_id,),
-            ).fetchone()
+                "SELECT * FROM subscriptions WHERE player_id=? ORDER BY start_date DESC, id DESC LIMIT 1",
+                (player_id,)).fetchone()
             if sub:
-                new_expiry = (date.fromisoformat(sub["expiry_date"]) + timedelta(days=days)).isoformat()
-                new_status = "active" if sub["sessions_used"] < sub["sessions_total"] and new_expiry >= today_str() else sub["status"]
-                con.execute("UPDATE subscriptions SET expiry_date=?, status=? WHERE id=?",
-                            (new_expiry, new_status, sub["id"]))
+                con.execute("UPDATE subscriptions SET paused_days = COALESCE(paused_days,0) + ? WHERE id=?",
+                            (days, sub["id"]))
     con.execute("UPDATE players SET status='active', frozen_at=NULL WHERE id=?", (player_id,))
     con.commit()
 
@@ -455,15 +509,42 @@ def coach_month_cost(con, coach, month=None):
     return coach["salary_amount"] or 0
 
 
+def _has_recurring(con):
+    try:
+        return "recurring" in {r["name"] for r in con.execute("PRAGMA table_info(expenses)").fetchall()}
+    except Exception:
+        return False
+
+
+def month_expense_rows(con, month=None):
+    """Effective expenses for a month: one-off entries dated in the month PLUS every
+    recurring (monthly) expense whose start month is on or before it. Recurring rows
+    are returned with `recurring=1` and their amount attributed to this month."""
+    month = month or date.today().strftime("%Y-%m")
+    if _has_recurring(con):
+        oneoff = con.execute(
+            "SELECT * FROM expenses WHERE COALESCE(recurring,0)=0 AND date LIKE ?", (month + "%",)).fetchall()
+        recur = con.execute(
+            "SELECT * FROM expenses WHERE recurring=1 AND substr(date,1,7) <= ?", (month,)).fetchall()
+        return list(oneoff) + list(recur)
+    return con.execute("SELECT * FROM expenses WHERE date LIKE ?", (month + "%",)).fetchall()
+
+
+def month_expense_total(con, month=None):
+    return sum((r["amount"] or 0) for r in month_expense_rows(con, month))
+
+
 def expenses_by_category(con, month=None):
     """Where the money went this month: [{category, total, share}] biggest first."""
     month = month or date.today().strftime("%Y-%m")
-    rows = con.execute(
-        "SELECT COALESCE(NULLIF(category,''),'other') c, SUM(amount) s FROM expenses "
-        "WHERE date LIKE ? GROUP BY c ORDER BY s DESC", (month + "%",)).fetchall()
-    total = sum(r["s"] or 0 for r in rows)
-    return [{"category": r["c"], "total": r["s"] or 0,
-             "share": round((r["s"] or 0) * 100 / total) if total else 0} for r in rows]
+    agg = {}
+    for r in month_expense_rows(con, month):
+        cat = (r["category"] or "other") if r["category"] else "other"
+        agg[cat] = agg.get(cat, 0) + (r["amount"] or 0)
+    total = sum(agg.values())
+    out = [{"category": c, "total": v, "share": round(v * 100 / total) if total else 0}
+           for c, v in agg.items()]
+    return sorted(out, key=lambda x: x["total"], reverse=True)
 
 
 def finance(con, month=None):
@@ -474,8 +555,7 @@ def finance(con, month=None):
     salaries = 0
     for c in con.execute("SELECT * FROM coaches WHERE active=1").fetchall():
         salaries += coach_month_cost(con, c, month)
-    other = con.execute(
-        "SELECT COALESCE(SUM(amount),0) s FROM expenses WHERE date LIKE ?", (month + "%",)).fetchone()["s"]
+    other = month_expense_total(con, month)
     expenses = salaries + other
     profit = revenue - expenses
     margin = round(profit * 100 / revenue) if revenue else None
