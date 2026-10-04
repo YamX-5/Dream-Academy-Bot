@@ -976,15 +976,23 @@ def finance(con, month=None, settings=None, _values=None):
     first, last = month_bounds(month)
     revenue = con.execute(
         "SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?", (month + "%",)).fetchone()["s"]
+    sponsor = event_income(con, month + "%", today_str())
+    revenue += sponsor
     salaries = month_salaries(con, month)
     other = month_expense_total(con, month, settings)
     expenses = round(salaries + other, 2)
     profit = round(revenue - expenses, 2)
     earned = earned_between(con, first, last, settings, _values)
     margin = round(profit * 100 / revenue) if revenue else None
-    return {"revenue": round(revenue, 2), "earned": earned, "salaries": round(salaries, 2), "other": other,
+    return {"revenue": round(revenue, 2), "sponsor": sponsor, "earned": earned, "salaries": round(salaries, 2), "other": other,
             "expenses": expenses, "profit": profit, "earned_profit": round(earned - expenses, 2),
             "margin": margin}
+
+
+def event_income(con, date_like, upto):
+    """Sponsorship / event money with a date matching date_like, up to `upto`."""
+    return round(con.execute("SELECT COALESCE(SUM(amount),0) s FROM events WHERE amount>0 AND date LIKE ? AND date<=?",
+                             (date_like, upto)).fetchone()["s"], 2)
 
 
 def _months_from(first_month, last_month):
@@ -1008,7 +1016,7 @@ def cash_balance(con, settings=None):
         if v:
             starts.append(v[:7])
     paid_in = con.execute("SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date<=?",
-                          (today_str(),)).fetchone()["s"]
+                          (today_str(),)).fetchone()["s"] + event_income(con, "%", today_str())
     # salaries count when actually handed over, so the balance is real cash
     paid_out = con.execute("SELECT COALESCE(SUM(amount),0) s FROM salary_payouts WHERE date<=?",
                            (today_str(),)).fetchone()["s"]
@@ -1030,13 +1038,17 @@ def month_projection(con, settings=None):
     month = today.strftime("%Y-%m")
     first, last = month_bounds(month)
     received = con.execute("SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?",
-                           (month + "%",)).fetchone()["s"]
+                           (month + "%",)).fetchone()["s"] + event_income(con, month + "%", today_str())
     due = []
     for p in con.execute("SELECT id, full_name FROM players WHERE status='active'").fetchall():
         sub = get_active_subscription(con, p["id"], settings)
         if sub and today <= _d(sub["expiry_date"]) <= last:
             due.append({"id": p["id"], "name": p["full_name"], "date": sub["expiry_date"], "amount": sub["price"],
                         "used": sub["sessions_used"], "total": sub["sessions_total"]})
+    # sponsorships / paid events still ahead this month
+    for e in con.execute("SELECT id, title, date, amount FROM events WHERE amount>0 AND date LIKE ? AND date>?",
+                         (month + "%", today_str())).fetchall():
+        due.append({"id": None, "name": e["title"], "date": e["date"], "amount": e["amount"], "used": 0, "total": 0})
     expected_in = round(sum(d["amount"] or 0 for d in due), 2)
     costs = round(month_salaries(con, month) + month_expense_total(con, month, settings, projected=True), 2)
     due.sort(key=lambda d: d["date"])

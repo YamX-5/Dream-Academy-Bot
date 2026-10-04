@@ -76,7 +76,7 @@
       <div>
         <div class="k">{{ t('m_received') }}</div>
         <div class="v mid num">{{ money(fin.revenue) }}<span class="u">JD</span></div>
-        <div class="s">{{ t('m_received_sub') }}</div>
+        <div class="s">{{ t('m_received_sub') }}{% if fin.sponsor %} · <span class="num">{{ t('m_incl_sponsor', n=money(fin.sponsor)) }}</span>{% endif %}</div>
       </div>
       <div>
         <div class="k">{{ t('m_earned') }}</div>
@@ -135,7 +135,7 @@
       <div class="sheet-hd ledger-rule" style="min-height:38px"><h3 class="label">{{ t('m_due_list') }}</h3><span class="meta num">{{ projection.due|length }}</span></div>
       <div class="rows">
         {% for d in projection.due %}
-        <a href="/players/{{ d.id }}" class="row" style="min-height:44px">
+        <a href="{{ ('/players/' ~ d.id) if d.id else '/events' }}" class="row" style="min-height:44px">
           <span class="flex-1 truncate font-semibold">{{ d.name }}</span>
           {{ tally(d.used, d.total, warn=True, anim=False) }}<span class="sub">{{ dmon(d.date, lang) }}</span>
           <span class="num w-14 text-end">{{ money(d.amount) }}</span></a>

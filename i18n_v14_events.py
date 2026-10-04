@@ -15,6 +15,7 @@ EN = {
     "e_kind_school": "School", "e_kind_outdoor": "Outdoor / open", "e_kind_indoor": "Indoor court",
     "e_kind_tournament": "Tournament", "e_kind_collab": "Collab", "e_kind_sponsorship": "Sponsorship",
     "e_kind_other": "Other",
+    "m_incl_sponsor": "incl. {n} JD from events",
 }
 
 AR = {
@@ -31,4 +32,5 @@ AR = {
     "e_kind_school": "مدرسة", "e_kind_outdoor": "برّا / مفتوح", "e_kind_indoor": "صالة داخلية",
     "e_kind_tournament": "بطولة", "e_kind_collab": "تعاون", "e_kind_sponsorship": "رعاية",
     "e_kind_other": "غير",
+    "m_incl_sponsor": "منها {n} دينار من فعاليات",
 }
