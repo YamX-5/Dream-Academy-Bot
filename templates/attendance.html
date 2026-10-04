@@ -1,355 +1,374 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
 {% block title %}{{ t('nav_attendance') }}{% endblock %}
+{% block head %}
+<style>
+  /* attendance tiles: readable on an outdoor court in daylight */
+  .ptile { position:relative; text-align:start; min-height:84px; padding:12px 12px 11px; border-radius:4px;
+           border:1px solid rgb(var(--rule-strong)); background:rgb(var(--sheet)); color:rgb(var(--ink));
+           transition:background .18s, border-color .18s, color .18s, transform .1s; user-select:none; -webkit-user-select:none;
+           -webkit-touch-callout:none; touch-action:manipulation; }
+  .ptile:active { transform:scale(.98); }
+  .ptile .nm { font-weight:800; font-size:15px; line-height:1.2; padding-inline-end:22px; }
+  .ptile .meta { margin-top:7px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .ptile .mk { position:absolute; top:10px; inset-inline-end:10px; width:20px; height:20px; display:grid; place-items:center; }
+  /* scorer's marks, one ink: present = inked solid, absent = struck out, excused = dashed */
+  .ptile.present { background:rgb(var(--ink)); border-color:rgb(var(--ink)); color:rgb(var(--sheet)); }
+  .ptile.present .tally i { border-color:rgb(var(--sheet) / .45); } .ptile.present .tally i.on { background:rgb(var(--sheet)); border-color:rgb(var(--sheet)); }
+  .ptile.present .tally i.nx { border-color:#6EA3EE; }
+  .ptile.present .tag { color:rgb(var(--sheet)); }
+  .ptile.absent { border-color:rgb(var(--bad)); border-width:1.5px; }
+  .ptile.absent .nm { text-decoration:line-through; text-decoration-thickness:2px; text-decoration-color:rgb(var(--bad)); color:rgb(var(--muted)); }
+  .ptile.absent .mk { color:rgb(var(--bad)); }
+  .ptile.excused { border-style:dashed; border-color:rgb(var(--warn)); border-width:1.5px; }
+  .ptile.excused .mk { color:rgb(var(--warn)); }
+  .ptile.nopkg:not(.present):not(.absent):not(.excused) { border-color:rgb(var(--bad) / .55); }
+  .ptile .left-n { font-variant-numeric:tabular-nums; }
+  .stamp { animation:stamp .38s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes stamp { from { transform:scale(1.9) rotate(-12deg); opacity:0; } to { transform:none; opacity:1; } }
+  .addtile { min-height:84px; border:1px dashed rgb(var(--rule-strong)); border-radius:4px; color:rgb(var(--acc-text));
+             display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-weight:700; font-size:13px; }
+  .addtile:hover { border-color:rgb(var(--acc)); background:rgb(var(--sheet)); }
+  .coach-tg.on { background:rgb(var(--ink)); border-color:rgb(var(--ink)); color:rgb(var(--sheet)); }
+</style>
+{% endblock %}
 {% block content %}
+<div class="stack">
 
-{% if role == 'coach' %}
-<div class="gr-hero flex items-center gap-3 mb-4">
-  <div class="gr-pulse">{{ icon('whistle','w-6 h-6') }}</div>
-  <div class="min-w-0">
-    <div class="font-extrabold text-lg text-ink leading-tight">{{ t('coach_hi') }}</div>
-    <div class="text-xs text-dim">{{ t('coach_pick_group') }}</div>
+  <div class="flex items-end gap-3 flex-wrap">
+    <div class="min-w-0">
+      <h1 class="h-page">{{ t('coach_hi') if role == 'coach' else t('nav_attendance') }}</h1>
+      <div class="sub mt-1">{{ t('coach_pick_group') }}</div>
+    </div>
   </div>
-</div>
-{% endif %}
 
-<!-- group picker (chips + search) -->
-<div class="mb-3">
-  <div class="flex items-center justify-between mb-1.5">
-    <div class="label-xs">{{ t('group') }}</div>
+  <!-- group chips -->
+  <section>
+    {% if groups %}
     {% if groups|length > 4 %}
-    <div class="relative">
-      <span class="absolute {{ 'right-2' if dir == 'rtl' else 'left-2' }} top-1/2 -translate-y-1/2 text-faint">{{ icon('search','w-3.5 h-3.5') }}</span>
+    <div class="relative mb-2">
+      <span class="absolute top-1/2 -translate-y-1/2 text-faint {{ 'right-3' if dir == 'rtl' else 'left-3' }}">{{ icon('search','w-4 h-4') }}</span>
       <input id="groupSearch" oninput="filterGroups(this.value)" placeholder="{{ t('search_group') }}"
-             class="w-40 bg-card border border-edge rounded-md {{ 'pr-7 pl-2' if dir == 'rtl' else 'pl-7 pr-2' }} py-1.5 text-xs focus:border-accent outline-none">
+             class="inp inp-sm {{ 'pr-9' if dir == 'rtl' else 'pl-9' }}" aria-label="{{ t('search_group') }}">
     </div>
     {% endif %}
+    <div id="groupChips" class="chips" role="tablist" aria-label="{{ t('group') }}">
+      {% for g in groups %}
+      <button type="button" class="da-tab !h-auto !py-2 flex-col !items-start !gap-0.5" role="tab" data-gid="{{ g.id }}"
+              data-name="{{ (g.name_ar ~ ' ' ~ g.name_en)|lower }}" onclick="selectGroup({{ g.id }}, this)">
+        <span class="whitespace-nowrap text-[13.5px]">{{ g.name_ar if lang == 'ar' else g.name_en }}</span>
+        {% if g.time_slot %}<span class="num text-[11px] font-semibold opacity-70 whitespace-nowrap">{{ g.time_slot }}</span>{% endif %}
+      </button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <a href="/groups" class="sheet empty block">{{ t('no_groups_yet') }}</a>
+    {% endif %}
+  </section>
+
+  <!-- date bar -->
+  <section class="sheet">
+    <div class="flex items-stretch">
+      <button type="button" id="prevDay" class="w-12 grid place-items-center text-ink2 hover:bg-card2 border-e border-edge" aria-label="previous day">
+        <svg class="w-5 h-5 flip-rtl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="flex-1 min-w-0 px-3 py-2.5 text-center">
+        <span id="dateMain" class="block font-extrabold text-[16px] leading-tight"></span>
+        <span id="dateSub" class="block text-[12px] mt-0.5"></span>
+        <input id="sdate" type="date" value="{{ default_date }}" aria-label="session date"
+               class="inp inp-sm num !w-auto !h-8 mt-2 mx-auto text-center">
+      </div>
+      <button type="button" id="todayBtn" class="hidden px-3 text-[13px] font-bold text-accent border-s border-edge hover:bg-card2">{{ t('today') }}</button>
+      <button type="button" id="nextDay" class="w-12 grid place-items-center text-ink2 hover:bg-card2 border-s border-edge" aria-label="next day">
+        <svg class="w-5 h-5 flip-rtl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+    <!-- coaches on court for this date -->
+    <div id="coachStrip" class="hidden ledger-rule px-4 py-3">
+      <div class="flex items-center gap-x-3 gap-y-2 flex-wrap">
+        <span class="label shrink-0">{{ t('c_coaches_on_court') }}</span>
+        <div id="coachList" class="flex flex-wrap gap-1.5 flex-1"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- tally + actions (when a group is picked) -->
+  <section id="statsBar" class="sheet hidden">
+    <div class="ledger" style="--cols:3">
+      <div><div class="k">{{ t('present_word') }}</div><div class="v mid num text-ok" id="pcount">0</div></div>
+      <div><div class="k">{{ t('absent_word') }}</div><div class="v mid num text-bad" id="acount">0</div></div>
+      <div><div class="k">{{ t('session_rate') }}</div><div class="v mid num" id="rateval">-</div></div>
+    </div>
+    <div class="sheet-ft flex-wrap">
+      <span class="sub num" id="marked">0 / 0</span>
+      <div class="ms-auto flex gap-2">
+        <button id="allBtn" class="btn btn-line btn-sm">{{ icon('check','w-4 h-4') }}{{ t('mark_all_present') }}</button>
+        <button id="closeBtn" class="btn btn-ink btn-sm">{{ t('close_session') }}</button>
+      </div>
+    </div>
+  </section>
+
+  <div>
+    <div class="sub mb-2" id="hint" style="display:none">{{ t('hint') }}</div>
+    <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"></div>
+    <details id="frozenBox" class="hidden mt-3">
+      <summary class="sub font-semibold py-2 inline-flex items-center gap-2">{{ icon('pause','w-3.5 h-3.5') }}<span id="frozenLbl"></span></summary>
+      <div id="frozenList" class="sub pt-1 leading-relaxed"></div>
+    </details>
+    <div id="empty" class="sheet empty !py-14">
+      <div class="mx-auto w-9 h-9 mb-3 text-faint">{{ icon('users','w-9 h-9') }}</div>
+      {{ t('pick_group_prompt') }}
+    </div>
   </div>
-  {% if groups %}
-  <div id="groupChips" class="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1" style="scrollbar-width:none">
-    {% for g in groups %}
-    <button type="button" class="gchip shrink-0 text-start" data-gid="{{ g.id }}"
-            data-name="{{ (g.name_ar ~ ' ' ~ g.name_en)|lower }}" onclick="selectGroup({{ g.id }}, this)">
-      <div class="whitespace-nowrap">{{ g.name_ar if lang == 'ar' else g.name_en }}</div>
-      {% if g.time_slot %}<div class="sub num whitespace-nowrap">{{ g.time_slot }}</div>{% endif %}
-    </button>
-    {% endfor %}
+</div>
+
+<!-- summary sheet -->
+<div id="modal" class="ovl" role="dialog" aria-modal="true" aria-labelledby="sumTitle">
+  <div class="panel">
+    <div class="panel-hd"><h3 id="sumTitle">{{ t('summary_title') }}</h3>
+      <button onclick="closeSheet('modal')" class="btn btn-line btn-sm btn-icon ms-auto" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+    <div class="panel-bd">
+      <pre id="summaryText" class="whitespace-pre-wrap text-[14px] leading-relaxed bg-bg border border-edge rounded p-3 mb-4 font-sans" dir="rtl"></pre>
+      <button onclick="copySummary()" class="btn btn-ink btn-block">{{ icon('whatsapp','w-4 h-4') }}{{ t('copy_whatsapp') }}</button>
+      <div id="copied" class="hidden text-ok text-sm text-center mt-2" role="status">{{ t('copied_note') }}</div>
+    </div>
   </div>
-  {% else %}
-  <a href="/groups" class="block bg-card border border-dashed border-edge rounded-lg px-4 py-4 text-center text-dim text-sm">
-    {{ t('no_groups_yet') }}
-  </a>
-  {% endif %}
+</div>
+
+<!-- add-player sheet -->
+<div id="addModal" class="ovl" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+  <div class="panel">
+    <div class="panel-hd"><h3 id="addTitle">{{ t('add_player_title') }}</h3>
+      <button onclick="closeSheet('addModal')" class="btn btn-line btn-sm btn-icon ms-auto" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+    <div class="panel-bd space-y-3">
+      <p class="sub">{{ t('add_player_hint') }}</p>
+      <label class="field"><span class="label">{{ t('player_name') }}</span>
+        <input id="npName" type="text" autocomplete="off" class="inp" autofocus></label>
+      <label class="field"><span class="label">{{ t('guardian_wa_opt') }}</span>
+        <input id="npPhone" type="tel" inputmode="tel" placeholder="07XXXXXXXX" class="inp num"></label>
+      <div id="npError" class="hidden text-bad text-sm" role="alert"></div>
+      <button id="npSubmit" onclick="submitAdd()" class="btn btn-ink btn-block">{{ t('add') }}</button>
+    </div>
+  </div>
 </div>
 <select id="group" class="sr-only" aria-hidden="true" tabindex="-1">
   <option value=""></option>{% for g in groups %}<option value="{{ g.id }}">{{ g.id }}</option>{% endfor %}
 </select>
-
-<!-- date bar: real native date input (no invisible overlay) + day arrows -->
-<div class="mb-3">
-  <div class="flex items-stretch gap-2">
-    <button type="button" id="prevDay" aria-label="previous day" class="bg-card border border-edge rounded-lg px-3 flex items-center justify-center text-dim hover:text-accent hover:border-accent/50 transition">
-      <svg class="w-5 h-5 rtl-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-    </button>
-    <input id="sdate" type="date" value="{{ default_date }}" aria-label="session date"
-           class="flex-1 min-w-0 bg-card border border-edge rounded-lg px-3 py-2.5 text-center font-semibold num focus:border-accent outline-none" />
-    <button type="button" id="nextDay" aria-label="next day" class="bg-card border border-edge rounded-lg px-3 flex items-center justify-center text-dim hover:text-accent hover:border-accent/50 transition">
-      <svg class="w-5 h-5 rtl-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-    </button>
-    <button type="button" id="todayBtn" class="hidden bg-accent/15 border border-accent/50 text-accent rounded-lg px-3 text-sm font-semibold transition">{{ t('today') }}</button>
-  </div>
-  <div class="flex items-center justify-center gap-2 mt-1.5">
-    <span id="dateMain" class="text-sm font-semibold"></span>
-    <span id="dateSub" class="text-[11px] text-dim"></span>
-  </div>
-</div>
-
-<!-- live stats + actions (shown when a group is picked) -->
-<div id="statsBar" class="hidden mb-3">
-  <div class="grid grid-cols-3 gap-2 mb-2">
-    <div class="bg-card border border-edge rounded-lg py-2 text-center">
-      <div class="text-xl font-bold num text-ok" id="pcount">0</div>
-      <div class="label-xs">{{ t('present_word') }}</div>
-    </div>
-    <div class="bg-card border border-edge rounded-lg py-2 text-center">
-      <div class="text-xl font-bold num text-bad" id="acount">0</div>
-      <div class="label-xs">{{ t('absent_word') }}</div>
-    </div>
-    <div class="bg-card border border-edge rounded-lg py-2 text-center">
-      <div class="text-xl font-bold num text-accent" id="rateval">—</div>
-      <div class="label-xs">{{ t('session_rate') }}</div>
-    </div>
-  </div>
-  <div class="flex items-center justify-between gap-2">
-    <div class="text-xs text-dim num" id="marked">0 / 0</div>
-    <div class="flex gap-2">
-      <button id="allBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-2 rounded-lg text-sm transition flex items-center gap-1.5">
-        {{ icon('check','w-4 h-4') }}{{ t('mark_all_present') }}</button>
-      <button id="closeBtn" class="bg-accent hover:bg-accent2 text-bg font-semibold px-3 py-2 rounded-lg text-sm transition">{{ t('close_session') }}</button>
-    </div>
-  </div>
-</div>
-
-<div class="text-xs text-dim mb-3" id="hint" style="display:none">{{ t('hint') }}</div>
-
-<div id="grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
-<div id="empty" class="text-center text-dim py-16">
-  <div class="mx-auto w-10 h-10 mb-3 text-dim/60">{{ icon('users','w-10 h-10') }}</div>
-  {{ t('pick_group_prompt') }}
-</div>
-
-<!-- summary modal -->
-<div id="modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-3">
-  <div class="bg-card rounded-xl p-5 w-full max-w-md border border-edge max-h-[80vh] overflow-y-auto">
-    <h3 class="font-bold text-lg mb-3">{{ t('summary_title') }}</h3>
-    <pre id="summaryText" class="whitespace-pre-wrap text-sm bg-bg rounded-lg p-3 mb-4 border border-edge" dir="rtl"></pre>
-    <div class="flex gap-2">
-      <button onclick="copySummary()" class="flex-1 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('copy_whatsapp') }}</button>
-      <button onclick="document.getElementById('modal').classList.add('hidden')"
-              class="px-4 bg-card2 hover:bg-card3 border border-edge rounded-lg transition">{{ t('close') }}</button>
-    </div>
-    <div id="copied" class="hidden text-ok text-sm text-center mt-2" role="status">{{ t('copied_note') }}</div>
-  </div>
-</div>
-
-<!-- add-player modal -->
-<div id="addModal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-3">
-  <div class="bg-card rounded-xl p-5 w-full max-w-md border border-edge">
-    <h3 class="font-bold text-lg mb-1">{{ t('add_player_title') }}</h3>
-    <p class="text-xs text-dim mb-4">{{ t('add_player_hint') }}</p>
-    <label class="label-xs" for="npName">{{ t('player_name') }}</label>
-    <input id="npName" type="text" autocomplete="off"
-           class="w-full bg-bg border border-edge rounded-lg px-3 py-3 mt-1 mb-3 focus:border-accent outline-none" />
-    <label class="label-xs" for="npPhone">{{ t('guardian_wa_opt') }}</label>
-    <input id="npPhone" type="tel" inputmode="tel" placeholder="07XXXXXXXX"
-           class="w-full bg-bg border border-edge rounded-lg px-3 py-3 mt-1 mb-4 num focus:border-accent outline-none" />
-    <div id="npError" class="hidden text-bad text-sm mb-3" role="alert"></div>
-    <div class="flex gap-2">
-      <button id="npSubmit" onclick="submitAdd()" class="flex-1 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('add') }}</button>
-      <button onclick="document.getElementById('addModal').classList.add('hidden')" class="px-4 bg-card2 hover:bg-card3 border border-edge rounded-lg transition">{{ t('cancel') }}</button>
-    </div>
-  </div>
-</div>
-{% endblock %}
-
-{% block head %}
-<style>
-  [dir="rtl"] .rtl-flip { transform: scaleX(-1); }
-</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
 const LANG = {{ lang|tojson }};
-const LOCALE = LANG === 'ar' ? 'ar' : 'en-GB';
+const LOCALE = LANG === 'ar' ? 'ar-JO-u-nu-latn' : 'en-GB';  // Latin digits in both languages
 const TODAY = {{ today|tojson }};
-const TRAINING_DAYS = {{ training_days|tojson }};
+const SCHEDULE = {{ schedule|tojson }};   // [{from, days:[...]}], oldest first
+const CLOSED = new Set({{ closed|tojson }});
 const I18N = {
-  left:   {{ t('left_badge')|tojson }},
-  noSub:  {{ t('no_sub_badge')|tojson }},
-  frozen: {{ t('frozen_badge')|tojson }},
-  saveError: {{ t('save_error')|tojson }},
-  newBadge: {{ t('new_badge')|tojson }},
-  addPlayer: {{ t('add_player')|tojson }},
-  addFailed: {{ t('add_failed')|tojson }},
-  add: {{ t('add')|tojson }},
-  adding: {{ t('adding')|tojson }},
-  today: {{ t('today')|tojson }},
-  yesterday: {{ t('yesterday')|tojson }},
-  tomorrow: {{ t('tomorrow')|tojson }},
-  notTraining: {{ t('not_training_day')|tojson }},
-  markedOf: {{ t('marked_of')|tojson }}
+  left: {{ t('left_badge')|tojson }}, leftShort: {{ t('c_left_short')|tojson }}, noSub: {{ t('no_sub_badge')|tojson }}, saveError: {{ t('save_error')|tojson }},
+  newBadge: {{ t('new_badge')|tojson }}, addPlayer: {{ t('add_player')|tojson }}, addFailed: {{ t('add_failed')|tojson }},
+  add: {{ t('add')|tojson }}, adding: {{ t('adding')|tojson }}, today: {{ t('today')|tojson }},
+  yesterday: {{ t('yesterday')|tojson }}, tomorrow: {{ t('tomorrow')|tojson }}, notTraining: {{ t('not_training_day')|tojson }},
+  markedOf: {{ t('marked_of')|tojson }}, closedDay: {{ t('c_closed_day')|tojson }}, frozenN: {{ t('c_frozen_n')|tojson }},
+  frozenToast: {{ t('c_frozen_toast')|tojson }}, unpaid: {{ t('c_unpaid')|tojson }}, coachFail: {{ t('save_error')|tojson }}
 };
 const SVG = {
-  present: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
-  absent:  '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-  excused: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>',
-  none: ''
+  present: '<svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  absent:  '<svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  excused: '<svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>'
 };
 const grid = document.getElementById('grid');
 const groupSel = document.getElementById('group');
 const dateInp = document.getElementById('sdate');
-let players = [];
-let curDate = TODAY;
-
-// high-contrast card states (readable on a court in daylight)
-const STYLES = {
-  present: 'bg-emerald-500 border-emerald-500 text-ink',
-  absent:  'bg-red-500/90 border-red-500 text-ink',
-  excused: 'bg-amber-400 border-amber-400 text-black',
-  none:    'bg-card border-edge text-ink'
-};
+let players = [], curDate = TODAY, justMarked = null;
 const NEXT = { none:'present', present:'absent', absent:'none', excused:'none' };
 
-function isoShift(iso, delta) {
-  const d = new Date(iso + 'T12:00:00');
-  d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
+function isoShift(iso, delta){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+delta);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function daysOn(iso){ let cur = SCHEDULE.length ? SCHEDULE[0].days : [];
+  for (const e of SCHEDULE) { if (e.from <= iso) cur = e.days; else break; } return cur; }
+function trainingState(iso){
+  if (CLOSED.has(iso)) return 'closed';
+  const wd = new Date(iso+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'});
+  return daysOn(iso).includes(wd) ? 'training' : 'off';
 }
-
-function refreshDateUI() {
-  const d = new Date(curDate + 'T12:00:00');
-  const wd = d.toLocaleDateString(LOCALE, {weekday: 'long'});
-  const dm = d.toLocaleDateString(LOCALE, {day: 'numeric', month: 'short'});
-  let prefix = '';
-  if (curDate === TODAY) prefix = I18N.today;
-  else if (curDate === isoShift(TODAY, -1)) prefix = I18N.yesterday;
-  else if (curDate === isoShift(TODAY, 1)) prefix = I18N.tomorrow;
+function setDateSub(state, wd){
+  const el = document.getElementById('dateSub');
+  el.textContent = state === 'training' ? wd : `${wd} · ${state === 'closed' ? I18N.closedDay : I18N.notTraining}`;
+  el.className = 'block text-[12px] mt-0.5 ' + (state === 'training' ? 'text-dim' : 'text-warn font-semibold');
+}
+function refreshDateUI(){
+  const d = new Date(curDate+'T12:00:00');
+  const wd = d.toLocaleDateString(LOCALE,{weekday:'long'});
+  const dm = d.toLocaleDateString(LOCALE,{day:'numeric', month:'long'});
+  let prefix = curDate===TODAY ? I18N.today : curDate===isoShift(TODAY,-1) ? I18N.yesterday : curDate===isoShift(TODAY,1) ? I18N.tomorrow : '';
   document.getElementById('dateMain').textContent = prefix ? `${prefix} · ${dm}` : `${wd} ${dm}`;
-  // English weekday name for training-day check
-  const wdEn = d.toLocaleDateString('en-US', {weekday: 'long'});
-  const isTraining = TRAINING_DAYS.includes(wdEn);
-  document.getElementById('dateSub').textContent = isTraining ? wd : `${wd} · ${I18N.notTraining}`;
-  document.getElementById('dateSub').className =
-    'text-[11px] leading-tight ' + (isTraining ? 'text-dim' : 'text-warn');
+  setDateSub(trainingState(curDate), wd);
   document.getElementById('todayBtn').classList.toggle('hidden', curDate === TODAY);
   dateInp.value = curDate;
 }
 
-async function load() {
+async function load(){
   const gid = groupSel.value;
   if (!gid) { grid.innerHTML=''; toggleUi(false); return; }
   const r = await fetch(`/api/attendance?group=${gid}&date=${curDate}`);
   if (r.status === 401) { location = '/login'; return; }
   const data = await r.json();
   players = data.players;
-  render();
-  toggleUi(true);
+  // the server knows closed days and schedule history best
+  if (!data.training && trainingState(curDate) === 'training')
+    setDateSub('off', new Date(curDate+'T12:00:00').toLocaleDateString(LOCALE,{weekday:'long'}));
+  renderFrozen(data.frozen || []);
+  render(); toggleUi(true);
 }
-
-function toggleUi(on) {
+function toggleUi(on){
   document.getElementById('empty').style.display = on ? 'none' : '';
   document.getElementById('statsBar').classList.toggle('hidden', !on);
   document.getElementById('hint').style.display = on ? '' : 'none';
+  if (!on) document.getElementById('frozenBox').classList.add('hidden');
+}
+function renderFrozen(list){
+  const box = document.getElementById('frozenBox');
+  box.classList.toggle('hidden', !list.length);
+  document.getElementById('frozenLbl').textContent = I18N.frozenN.replace('{n}', list.length);
+  document.getElementById('frozenList').textContent = list.map(p => p.name).join(' · ');
 }
 
-function render() {
+function render(){
   grid.innerHTML = '';
-  const rtl = document.documentElement.dir === 'rtl';
   players.forEach(p => {
     const card = document.createElement('button');
-    card.className = `relative rounded-lg border-2 px-2 py-4 text-center font-semibold leading-tight
-      transition select-none min-h-[80px] ${STYLES[p.status]} ${!p.paid ? 'ring-2 ring-bad/80' : ''}`;
+    card.type = 'button';
+    card.className = `ptile ${p.status !== 'none' ? p.status : ''} ${!p.paid ? 'nopkg' : ''}`;
+    card.setAttribute('aria-pressed', p.status === 'present' ? 'true' : 'false');
+    const tot = Math.min(p.total || 0, 30), used = Math.max(0, tot - (p.left || 0));
+    const boxes = tot ? `<span class="tally">${Array.from({length: tot}, (_, i) => `<i class="${i < used ? 'on' : (i === used ? 'nx' : '')}"></i>`).join('')}</span>` : '';
+    const left = p.paid
+      ? `${boxes}<span class="left-n">${_esc(I18N.leftShort.replace('{n}', p.left))}</span>`
+      : `<span class="tag ${p.status==='none' ? 'tag-bad' : ''}">${_esc(I18N.noSub)}</span>`;
     card.innerHTML = `
-      <div class="text-[15px]">${p.name}</div>
-      <div class="mt-1 text-xs font-normal num ${p.status==='none' && p.left <= 2 ? 'text-bad font-semibold' : 'opacity-80'}">
-        ${p.paid ? I18N.left.replace('{n}', p.left) : `<span class="${p.status==='none'?'text-bad':''}">${I18N.noSub}</span>`}
+      <div class="nm">${_esc(p.name)}</div>
+      <div class="meta ${p.status==='none' && p.paid && p.left <= 2 ? 'text-warn' : (p.status==='none' ? 'text-dim' : '')}">
+        ${left}
+        ${p.unpaid && p.status==='present' ? `<span class="tag">${_esc(I18N.unpaid)}</span>` : ''}
+        ${p.pending ? `<span class="tag ${p.status==='none' ? 'tag-warn' : ''}">${_esc(I18N.newBadge)}</span>` : ''}
       </div>
-      ${p.frozen ? `<div class="text-[10px] uppercase tracking-wide mt-0.5 opacity-80">${I18N.frozen}</div>` : ''}
-      ${p.pending ? `<span class="absolute top-1.5 ${rtl?'right-1.5':'left-1.5'} text-[9px] uppercase tracking-wide bg-amber-500/30 text-amber-100 rounded px-1 py-0.5">${I18N.newBadge}</span>` : ''}
-      ${p.status !== 'none' ? `<span class="absolute top-1.5 ${rtl?'left-1.5':'right-1.5'}">${SVG[p.status]}</span>` : ''}`;
-    let timer = null, longFired = false;
-    const start = () => { longFired = false; timer = setTimeout(() => { longFired = true; mark(p, 'excused'); }, 550); };
-    const end = (e) => { clearTimeout(timer); if (!longFired) mark(p, NEXT[p.status]); e.preventDefault(); };
+      ${p.status !== 'none' ? `<span class="mk ${justMarked === p.id ? 'stamp' : ''}">${SVG[p.status]}</span>` : ''}`;
+    let timer = null, longFired = false, moved = false;
+    const start = () => { longFired = false; moved = false; timer = setTimeout(() => { longFired = true; mark(p, 'excused'); }, 550); };
+    const end = (e) => { clearTimeout(timer); e.preventDefault(); if (!longFired && !moved) mark(p, NEXT[p.status]); };
     card.addEventListener('touchstart', start, {passive:true});
     card.addEventListener('touchend', end);
-    card.addEventListener('touchmove', () => clearTimeout(timer), {passive:true});
+    card.addEventListener('touchmove', () => { moved = true; clearTimeout(timer); }, {passive:true});
     card.addEventListener('mousedown', e => { if (e.button===0) start(); });
     card.addEventListener('mouseup', e => { if (e.button===0) end(e); });
+    card.addEventListener('keydown', e => { if (e.key==='Enter' || e.key===' ') { e.preventDefault(); mark(p, NEXT[p.status]); } });
     card.addEventListener('contextmenu', e => e.preventDefault());
     grid.appendChild(card);
   });
   const add = document.createElement('button');
-  add.type = 'button';
-  add.className = 'rounded-lg border-2 border-dashed border-accent/50 text-accent px-2 py-4 flex flex-col items-center justify-center gap-1 hover:bg-accent/10 transition min-h-[80px]';
-  add.innerHTML = `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span class="text-xs font-semibold">${I18N.addPlayer}</span>`;
+  add.type = 'button'; add.className = 'addtile';
+  add.innerHTML = `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg><span>${_esc(I18N.addPlayer)}</span>`;
   add.addEventListener('click', openAdd);
   grid.appendChild(add);
+  justMarked = null;
   updateStats();
 }
 
-async function mark(p, status) {
-  const r = await fetch('/api/attendance/mark', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({player_id: p.id, date: curDate, group_id: groupSel.value, status})
-  });
-  if (!r.ok) { alert(I18N.saveError); return; }
+async function mark(p, status){
+  const r = await fetch('/api/attendance/mark', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({player_id: p.id, date: curDate, group_id: groupSel.value, status}) });
+  if (r.status === 409) { toast(I18N.frozenToast); load(); return; }
+  if (!r.ok) { toast(I18N.saveError); return; }
   const d = await r.json();
-  p.status = d.status; p.left = d.left; p.paid = d.paid;
+  p.status = d.status; p.left = d.left; p.paid = d.paid; p.unpaid = d.unpaid;
+  justMarked = p.id;
+  if (navigator.vibrate) navigator.vibrate(12);
   render();
 }
-
-function updateStats() {
+function updateStats(){
   const present = players.filter(p=>p.status==='present').length;
   const absent  = players.filter(p=>p.status==='absent').length;
   const marked  = players.filter(p=>p.status!=='none').length;
   const counted = present + absent;
   document.getElementById('pcount').textContent = present;
   document.getElementById('acount').textContent = absent;
-  document.getElementById('rateval').textContent = counted ? Math.round(present*100/counted) + '%' : '—';
+  document.getElementById('rateval').textContent = counted ? Math.round(present*100/counted) + '%' : '-';
   document.getElementById('marked').textContent = I18N.markedOf.replace('{n}', marked).replace('{t}', players.length);
 }
 
 document.getElementById('allBtn').addEventListener('click', async () => {
-  const r = await fetch('/api/attendance/mark-all-present', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({group_id: groupSel.value, date: curDate})
-  });
-  if (r.ok) load();
+  const r = await fetch('/api/attendance/mark-all-present', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({group_id: groupSel.value, date: curDate}) });
+  if (r.ok) load(); else toast(I18N.saveError);
 });
-
 document.getElementById('closeBtn').addEventListener('click', async () => {
   const r = await fetch(`/api/attendance/summary?group=${groupSel.value}&date=${curDate}`);
   const d = await r.json();
   document.getElementById('summaryText').textContent = d.text;
   document.getElementById('copied').classList.add('hidden');
-  document.getElementById('modal').classList.remove('hidden');
+  openSheet('modal');
 });
-
-function copySummary() {
+function copySummary(){
   const text = document.getElementById('summaryText').textContent;
   (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
-    .catch(() => { const ta = document.createElement('textarea'); ta.value = text;
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); })
+    .catch(() => { const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); })
     .finally(() => document.getElementById('copied').classList.remove('hidden'));
 }
 
-function openAdd() {
-  document.getElementById('npName').value = '';
-  document.getElementById('npPhone').value = '';
+function openAdd(){
+  document.getElementById('npName').value=''; document.getElementById('npPhone').value='';
   document.getElementById('npError').classList.add('hidden');
-  document.getElementById('addModal').classList.remove('hidden');
-  setTimeout(() => document.getElementById('npName').focus(), 50);
+  openSheet('addModal'); setTimeout(() => document.getElementById('npName').focus(), 80);
 }
-
-async function submitAdd() {
+async function submitAdd(){
   const name = document.getElementById('npName').value.trim();
   const phone = document.getElementById('npPhone').value.trim();
-  const err = document.getElementById('npError');
-  const btn = document.getElementById('npSubmit');
+  const err = document.getElementById('npError'), btn = document.getElementById('npSubmit');
   if (!name) { err.textContent = I18N.addFailed; err.classList.remove('hidden'); return; }
   btn.disabled = true; btn.textContent = I18N.adding;
-  const r = await fetch('/api/attendance/add-player', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({name, guardian_phone: phone, group_id: groupSel.value})
-  });
+  const r = await fetch('/api/attendance/add-player', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, guardian_phone: phone, group_id: groupSel.value}) });
   btn.disabled = false; btn.textContent = I18N.add;
   if (!r.ok) { err.textContent = I18N.addFailed; err.classList.remove('hidden'); return; }
   const d = await r.json();
-  players.push(d.player);
-  players.sort((a, b) => a.name.localeCompare(b.name));
-  document.getElementById('addModal').classList.add('hidden');
-  render();
+  players.push(d.player); players.sort((a,b) => a.name.localeCompare(b.name));
+  closeSheet('addModal'); render();
 }
 
-// date navigation
-document.getElementById('prevDay').addEventListener('click', () => { curDate = isoShift(curDate, -1); refreshDateUI(); load(); });
-document.getElementById('nextDay').addEventListener('click', () => { curDate = isoShift(curDate, 1); refreshDateUI(); load(); });
-document.getElementById('todayBtn').addEventListener('click', () => { curDate = TODAY; refreshDateUI(); load(); });
-dateInp.addEventListener('change', () => { if (dateInp.value) { curDate = dateInp.value; refreshDateUI(); load(); } });
+// coaches on court (per date)
+async function loadCoaches(){
+  const r = await fetch(`/api/coaches?date=${curDate}`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const strip = document.getElementById('coachStrip');
+  strip.classList.toggle('hidden', !d.coaches.length);
+  document.getElementById('coachList').innerHTML = d.coaches.map(c =>
+    `<button type="button" class="da-tab coach-tg ${c.present ? 'on' : ''}" aria-pressed="${c.present}" data-id="${c.id}">${c.present ? SVG.present.replace('w-[18px] h-[18px]','w-3.5 h-3.5') : ''}${_esc(c.name)}</button>`).join('');
+  document.querySelectorAll('.coach-tg').forEach(b => b.addEventListener('click', async () => {
+    const r = await fetch(`/coaches/${b.dataset.id}/present`, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({date: curDate}) });
+    if (!r.ok) { toast(I18N.coachFail); return; }
+    loadCoaches();
+  }));
+}
+
+function goDate(iso){ curDate = iso; refreshDateUI(); load(); loadCoaches(); }
+document.getElementById('prevDay').addEventListener('click', () => goDate(isoShift(curDate, -1)));
+document.getElementById('nextDay').addEventListener('click', () => goDate(isoShift(curDate, 1)));
+document.getElementById('todayBtn').addEventListener('click', () => goDate(TODAY));
+dateInp.addEventListener('change', () => { if (dateInp.value) goDate(dateInp.value); });
 function selectGroup(gid, el){
   groupSel.value = gid;
-  document.querySelectorAll('.gchip').forEach(c => c.classList.toggle('on', c === el));
+  document.querySelectorAll('#groupChips .da-tab').forEach(c => { c.classList.toggle('on', c === el); c.setAttribute('aria-selected', c === el); });
   load();
 }
 function filterGroups(q){
   q = (q||'').trim().toLowerCase();
-  document.querySelectorAll('#groupChips .gchip').forEach(c => {
-    c.style.display = (!q || (c.dataset.name||'').includes(q)) ? '' : 'none';
-  });
+  document.querySelectorAll('#groupChips .da-tab').forEach(c => { c.style.display = (!q || (c.dataset.name||'').includes(q)) ? '' : 'none'; });
 }
-groupSel.addEventListener('change', load);
-
-refreshDateUI();
+refreshDateUI(); loadCoaches();
+// deep link: /attendance?group=<id> opens that group directly
+(function(){ const g = new URLSearchParams(location.search).get('group');
+  const chip = g && document.querySelector(`#groupChips [data-gid="${CSS.escape(g)}"]`); if (chip) chip.click(); })();
 </script>
 {% endblock %}

@@ -1,0 +1,48 @@
+# -*- coding: utf-8 -*-
+"""v14 strings: shell + dashboard. English default, Arabic in Jordanian dialect."""
+
+EN = {
+    "see_all": "See all",
+    "d_training_day": "Training day", "d_rest_day": "No training today",
+    "d_present_today": "present today", "d_add_player": "Add player",
+    "d_money_now": "Money right now",
+    "d_cash_box": "Cash in the box", "d_cash_box_sub": "Received minus everything paid out",
+    "d_owed": "Owed to you", "d_owed_sub": "{n} players · balances + unpaid sessions",
+    "d_month_lands": "This month lands at",
+    "d_received": "Received", "d_expected": "Renewals due", "d_costs": "Costs",
+    "d_salaries_due": "Salaries due",
+    "d_ranked": "By days left",
+    "d_left_days": "{n} left · {d} days",
+    "d_no_renewals": "Nobody needs renewing right now.",
+    "d_balance_left": "{n} JD left on package",
+    "d_unpaid_sessions": "{n} unpaid sessions", "d_unpaid_session": "1 unpaid session",
+    "d_nobody_owes": "Nobody owes anything.",
+    "d_today_costs": "Today's court & water",
+    "d_log_more": "Log more costs",
+    "d_no_session_today": "No session today.",
+    "d_log_other_day": "Log another day",
+    "d_total": "Total", "d_log_session": "Log session",
+}
+
+AR = {
+    "see_all": "عرض الكل",
+    "d_training_day": "يوم تمرين", "d_rest_day": "ما في تمرين اليوم",
+    "d_present_today": "حاضرين اليوم", "d_add_player": "لاعب جديد",
+    "d_money_now": "وضع المصاري هلأ",
+    "d_cash_box": "المصاري بالصندوق", "d_cash_box_sub": "الواصل ناقص كل اشي انصرف",
+    "d_owed": "إلكم عند الناس", "d_owed_sub": "{n} لاعب · باقي اشتراكات + حصص مش مدفوعة",
+    "d_month_lands": "الشهر رح يسكّر على",
+    "d_received": "وصل", "d_expected": "تجديدات جاية", "d_costs": "مصاريف",
+    "d_salaries_due": "رواتب مستحقة",
+    "d_ranked": "حسب الأيام الباقية",
+    "d_left_days": "ضل {n} · {d} يوم",
+    "d_no_renewals": "ما في حدا بده تجديد هلأ.",
+    "d_balance_left": "باقي عليه {n} دينار",
+    "d_unpaid_sessions": "{n} حصص مش مدفوعة", "d_unpaid_session": "حصة وحدة مش مدفوعة",
+    "d_nobody_owes": "ما في حدا عليه اشي.",
+    "d_today_costs": "ملعب ومي اليوم",
+    "d_log_more": "سجّل مصاريف زيادة",
+    "d_no_session_today": "ما في تمرين اليوم.",
+    "d_log_other_day": "سجّل ليوم ثاني",
+    "d_total": "المجموع", "d_log_session": "سجّل الحصة",
+}

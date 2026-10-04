@@ -1,256 +1,364 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_logo.html" import logo %}
+{% from "_ui.html" import tally, money, dmon, mony %}
 {% block title %}{{ p.full_name }}{% endblock %}
+{% macro dm(iso) %}{{ dmon(iso, lang) }}{% endmacro %}
 {% block content %}
-{% set avatar_palette = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
-{% set parts = p.full_name.split() %}
-<div class="flex items-start gap-3 mb-4">
-  <span class="av !w-12 !h-12 !text-lg" style="background: {{ avatar_palette[p.id % 6] }}">{{ parts[0][0] }}{{ parts[1][0] if parts|length > 1 else '' }}</span>
-  <div class="flex-1 min-w-0">
-    <h1 class="text-xl font-bold text-ink flex items-center gap-2 flex-wrap">{{ p.full_name }}
-      {% if p.status=='pending' %}<span class="pill pill-warn">{{ t('pending_badge') }}</span>{% endif %}
-      {% if p.status=='frozen' %}<span class="pill pill-sky">{{ t('st_frozen') }}</span>{% endif %}
-      {% if p.status=='left' %}<span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}
-    </h1>
-    <div class="text-sm text-dim mt-1">
-      {{ p.group_name or t('no_group') }} · {{ t('male') if p.gender=='M' else t('female') }}
-      {% if p.birth_date %} · {{ t('born') }} <span class="num">{{ p.birth_date }}</span>{% endif %}
+<div class="stack">
+
+  <!-- header -->
+  <div class="flex items-start gap-3 flex-wrap">
+    <div class="min-w-0 flex-1">
+      <h1 class="h-page flex items-center gap-2 flex-wrap">{{ p.full_name }}
+        {% if p.status=='pending' %}<span class="tag tag-warn">{{ t('pending_badge') }}</span>{% endif %}
+        {% if p.status=='frozen' %}<span class="tag tag-acc">{{ t('st_frozen') }}</span>{% endif %}
+        {% if p.status=='left' %}<span class="tag tag-mute">{{ t('st_left') }}</span>{% endif %}
+      </h1>
+      <div class="sub mt-1">
+        {{ p.group_name or t('no_group') }} · {{ t('male') if p.gender=='M' else t('female') }}
+        {% if p.birth_date %} · {{ t('born') }} <span class="num">{{ p.birth_date }}</span>{% endif %}
+      </div>
+      {% if p.guardian_name or p.guardian_phone %}<div class="sub">{{ t('guardian_label') }}: {{ p.guardian_name }} <span dir="ltr" class="num">{{ p.guardian_phone }}</span></div>{% endif %}
+      {% if p.notes %}<div class="text-[13.5px] text-warn mt-1">{{ p.notes }}</div>{% endif %}
     </div>
-    {% if p.guardian_name %}<div class="text-sm text-dim">{{ t('guardian_label') }}: {{ p.guardian_name }} — <span dir="ltr" class="num">{{ p.guardian_phone }}</span></div>{% endif %}
-    {% if p.notes %}<div class="text-sm text-warn mt-1">{{ p.notes }}</div>{% endif %}
+    <a href="/players/{{ p.id }}/edit" class="btn btn-line btn-sm">{{ icon('edit','w-3.5 h-3.5') }}{{ t('edit') }}</a>
   </div>
-  <a href="/players/{{ p.id }}/edit" class="flex items-center gap-1.5 bg-card2 hover:bg-card3 border border-edge px-3 py-2 rounded-lg text-sm shrink-0 transition">
-    {{ icon('edit','w-3.5 h-3.5') }}{{ t('edit') }}</a>
-</div>
 
-<!-- subscription bar: the centerpiece -->
-<div class="bg-card rounded-xl p-5 border {{ 'border-accent/50' if info.active else 'border-bad/50' }} mb-4">
-  <div class="label-xs mb-2">{{ t('current_sub') }}</div>
-  {% if info.active %}
-    {% set used = info.used %}{% set total = info.sub.sessions_total %}
-    <div class="flex gap-1.5 mb-3" dir="ltr">
-      {%- for i in range(total) %}
-      <span class="h-2 flex-1 rounded-full {{ 'bg-accent' if i < used else 'bg-card3' }}"></span>
-      {% endfor -%}
-    </div>
-    <div class="font-semibold num">{{ t('sub_left_expires', n=info.left) }}
-      <span class="text-dim font-normal text-sm">· {{ t('expires_on', d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7], days=info.days_left) }}</span>
-    </div>
-    <div class="text-[11px] text-faint mt-1">{{ t('calendar_sub_hint') }}</div>
-    {% if info.needs_renewal %}<div class="flex items-center gap-1.5 text-warn text-sm mt-2">{{ icon('clock','w-4 h-4') }}{{ t('renew_soon') }}</div>{% endif %}
-  {% else %}
-    <div class="flex items-center gap-2 font-semibold text-bad">{{ icon('alert','w-4 h-4') }}{{ t('no_active_sub') }}</div>
-    {% if info.sub %}<div class="text-xs text-dim mt-1 num">{{ t('last_sub') }}: {{ info.sub.start_date }} ({{ t('sub_' ~ info.sub.status) }})</div>{% endif %}
-  {% endif %}
-  <!-- trial status -->
-  <div class="flex items-center gap-2 mt-3 pt-3 border-t border-edge2 text-xs">
-    {% if trial_date %}
-      <span class="pill pill-sky">{{ t('trial_tag') }}</span>
-      <span class="text-dim num">{{ t('trial_used_on', d=trial_date) }}</span>
-    {% elif p.trial_used %}
-      <span class="pill pill-muted">{{ t('trial_tag') }}</span>
-      <span class="text-dim">{{ t('trial_marked_used') }}</span>
-    {% else %}
-      <span class="pill pill-ok">{{ t('trial_tag') }}</span>
-      <span class="text-dim">{{ t('trial_available') }}</span>
-    {% endif %}
-  </div>
-</div>
-
-<div class="grid grid-cols-3 gap-2 mb-6 text-sm">
-  <button onclick="document.getElementById('renewModal').classList.remove('hidden')"
-          class="flex items-center justify-center gap-1.5 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">
-    {{ icon('renew','w-4 h-4') }}{{ t('renew') }}</button>
-  {% if p.status == 'frozen' %}
-  <button onclick="act('unfreeze')" class="flex items-center justify-center gap-1.5 bg-card2 hover:bg-card3 border border-edge py-3 rounded-lg font-semibold transition">
-    {{ icon('play','w-4 h-4') }}{{ t('unfreeze') }}</button>
-  {% else %}
-  <button onclick="act('freeze')" class="flex items-center justify-center gap-1.5 bg-card2 hover:bg-card3 border border-edge py-3 rounded-lg font-semibold transition">
-    {{ icon('pause','w-4 h-4') }}{{ t('freeze') }}</button>
-  {% endif %}
-  {% if p.guardian_phone or p.phone %}
-  <a href="{{ wa }}" target="_blank" class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition">
-    {{ icon('message','w-4 h-4') }}{{ t('whatsapp') }}</a>
-  {% else %}
-  <div class="flex items-center justify-center bg-card2 border border-edge text-dim py-3 rounded-lg text-xs">{{ t('no_number') }}</div>
-  {% endif %}
-</div>
-
-<h2 class="label-xs mb-2">{{ t('payments') }}</h2>
-<div class="bg-card rounded-lg border border-edge mb-5 divide-y divide-edge2">
-  {% for pay in pays %}
-  <details>
-    <summary class="px-4 py-2.5 flex justify-between items-center text-sm cursor-pointer select-none">
-      <div><span class="font-semibold num">{{ pay.amount }} JD</span> <span class="text-dim">· {{ t(pay.method) if pay.method in ['cash','cliq','other'] else pay.method }}</span></div>
-      <div class="text-dim num flex items-center gap-2">{{ pay.date }}
-        <span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span></div>
-    </summary>
-    <div class="px-4 pb-3 pt-1 border-t border-edge2">
-      <form method="post" action="/payments/{{ pay.id }}/edit" class="grid grid-cols-3 gap-2 text-sm">
-        <div><label class="label-xs">{{ t('amount') }}</label>
-          <input name="amount" type="number" step="0.5" value="{{ pay.amount }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
-        <div><label class="label-xs">{{ t('method') }}</label>
-          <select name="method" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 focus:border-accent outline-none">
-            <option value="cash" {% if pay.method=='cash' %}selected{% endif %}>{{ t('cash') }}</option>
-            <option value="cliq" {% if pay.method=='cliq' %}selected{% endif %}>{{ t('cliq') }}</option>
-            <option value="other" {% if pay.method=='other' %}selected{% endif %}>{{ t('other') }}</option>
-          </select></div>
-        <div><label class="label-xs">{{ t('date') }}</label>
-          <input name="date" type="date" value="{{ pay.date }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
-        <div class="col-span-3"><label class="label-xs">{{ t('note') }}</label>
-          <input name="note" value="{{ pay.note }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 focus:border-accent outline-none"></div>
-        <button class="col-span-3 bg-accent text-bg font-semibold rounded-md py-2 mt-1">{{ t('save') }}</button>
-      </form>
-      <div class="flex items-center justify-between mt-2">
-        <a class="text-accent text-xs hover:underline" href="/receipt/{{ pay.id }}">{{ pay.receipt_no }}</a>
-        <form method="post" action="/payments/{{ pay.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_payment')|tojson }})">
-          <button class="text-bad text-xs font-medium">{{ t('delete_payment') }}</button>
-        </form>
+  <div class="grid gap-4 lg:gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] items-start">
+    <!-- member card -->
+    <div class="member flex flex-col" aria-label="{{ t('p_member_card') }}">
+      <div class="flex items-start justify-between gap-3">
+        {{ logo('w-[54px]') }}
+        <span class="wordmark !text-[10px]">DREAM ACADEMY</span>
+      </div>
+      
+      <div class="mt-auto">
+        <div class="name truncate">{{ p.full_name }}</div>
+        <div class="text-[12px] font-semibold text-[#A3A8B2] mt-0.5 truncate">{{ p.group_name or t('no_group') }}</div>
+        <div class="mt-3 flex items-center gap-3 flex-wrap">
+          {% if info.active %}
+            {{ tally(info.used, info.sub.sessions_total, warn=info.needs_renewal) }}
+            <span class="text-[12.5px] font-bold num">{% if info.upcoming %}{{ t('p_starts', d=dm(info.sub.start_date)) }}{% else %}{{ t('p_left_n', n=info.left) }}{% endif %}</span>
+          {% else %}
+            {{ tally(0, info.sub.sessions_total if info.sub else settings.sessions_per_month, dead=True, anim=False) }}
+            <span class="text-[12.5px] font-bold text-bad">{{ t('no_active_sub') }}</span>
+          {% endif %}
+        </div>
+        <div class="mt-3 grid grid-cols-3 gap-2 label !text-[10px]">
+          <div>{{ t('p_member_since') }}<div class="text-[13px] font-bold text-[#ECEEF2] normal-case tracking-normal mt-0.5">{{ mony(p.join_date, lang) }}</div></div>
+          <div>{{ t('p_next') }}<div class="text-[13px] font-bold text-[#ECEEF2] normal-case tracking-normal mt-0.5">{{ dmon(info.next_session, lang) }}</div></div>
+          <div class="text-end">{{ t('p_package') }}<div class="text-[13px] font-bold text-[#ECEEF2] normal-case tracking-normal mt-0.5">{{ money(info.sub.price) if info.sub else '-' }} JD</div></div>
+        </div>
       </div>
     </div>
-  </details>
-  {% else %}<div class="px-4 py-3 text-dim text-sm">{{ t('no_payments') }}</div>{% endfor %}
-</div>
 
-<h2 class="label-xs mb-2">{{ t('subscriptions') }}</h2>
-<div class="bg-card rounded-lg border border-edge mb-5 divide-y divide-edge2">
-  {% for s in subs %}
-  <details>
-    <summary class="px-4 py-2.5 flex justify-between items-center text-sm cursor-pointer select-none">
-      <div dir="ltr" class="num">{{ s.start_date }} → {{ s.expiry_date }}</div>
-      <div class="flex items-center gap-2 num">
-        <span class="text-dim">{{ s.sessions_used }}/{{ s.sessions_total }}</span>
-        <span class="{{ 'text-ok' if s.status=='active' else 'text-dim' }}">{{ t('sub_' ~ s.status) }}</span>
-        <span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span>
+    <div class="stack !mt-0">
+      <!-- ledger -->
+      <section class="sheet">
+        <div class="ledger" style="--cols:3">
+          <div>
+            <div class="k">{{ t('p_balance') }}</div>
+            <div class="v mid num {{ 'text-warn' if balance > 0 else ('text-ok' if balance < 0 else '') }}">{{ money(balance if balance > 0 else -balance) }}<span class="u">JD</span></div>
+            <div class="s">{% if balance > 0 %}{{ t('p_owes') }}{% elif balance < 0 %}{{ t('p_credit') }}{% else %}{{ t('p_settled') }}{% endif %}</div>
+          </div>
+          <div>
+            <div class="k">{{ t('p_sessions_left') }}</div>
+            <div class="v mid num">{{ info.left if info.active else 0 }}</div>
+            <div class="s num">{% if info.active %}{{ t('expires_on', d=dm(info.sub.expiry_date), days=info.days_left) }}{% else %}-{% endif %}</div>
+          </div>
+          <div>
+            <div class="k">{{ t('att_rate') }}</div>
+            <div class="v mid num {{ ('text-ok' if att_stats.rate >= 75 else ('text-warn' if att_stats.rate >= 50 else 'text-bad')) if att_stats.rate is not none }}">{{ att_stats.rate if att_stats.rate is not none else '-' }}{% if att_stats.rate is not none %}<span class="u">%</span>{% endif %}</div>
+            <div class="s">{% if att_stats.streak >= 2 %}{{ t('att_streak', n=att_stats.streak) }}{% else %}{{ t('att_breakdown', p=att_stats.present, a=att_stats.absent, e=att_stats.excused) }}{% endif %}</div>
+          </div>
+        </div>
+        <div class="ledger-rule px-4 py-3 text-[13px] flex items-center gap-2 flex-wrap">
+          {% if trial_date %}<span class="tag tag-acc">{{ t('trial_tag') }}</span><span class="sub num">{{ t('trial_used_on', d=trial_date) }}</span>
+          {% elif p.trial_used %}<span class="tag tag-mute">{{ t('trial_tag') }}</span><span class="sub">{{ t('trial_marked_used') }}</span>
+          {% else %}<span class="tag tag-ok">{{ t('trial_tag') }}</span><span class="sub">{{ t('trial_available') }}</span>{% endif %}
+          {% if info.needs_renewal and info.active %}<span class="ms-auto text-warn font-bold flex items-center gap-1.5">{{ icon('clock','w-4 h-4') }}{{ t('renew_soon') }}</span>{% endif %}
+        </div>
+      </section>
+
+      <!-- actions -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <button onclick="openSheet('renewSheet')" class="btn btn-ink">{{ icon('renew','w-4 h-4') }}{{ t('renew') }}</button>
+        <button onclick="openSheet('paySheet')" class="btn btn-line">{{ icon('wallet','w-4 h-4') }}{{ t('p_record_payment') }}</button>
+        {% if p.status == 'frozen' %}
+        <button onclick="openSheet('unfreezeSheet')" class="btn btn-line">{{ icon('play','w-4 h-4') }}{{ t('unfreeze') }}</button>
+        {% else %}
+        <button onclick="openSheet('freezeSheet')" class="btn btn-line">{{ icon('pause','w-4 h-4') }}{{ t('freeze') }}</button>
+        {% endif %}
+        {% if p.guardian_phone or p.phone %}
+        <a href="{{ wa }}" target="_blank" rel="noopener" class="btn btn-wa">{{ icon('whatsapp','w-4 h-4') }}{{ t('whatsapp') }}</a>
+        {% else %}
+        <span class="btn btn-line !text-faint !cursor-default">{{ t('no_number') }}</span>
+        {% endif %}
       </div>
-    </summary>
-    <div class="px-4 pb-3 pt-1 border-t border-edge2">
-      <form method="post" action="/subscriptions/{{ s.id }}/edit" class="grid grid-cols-2 gap-2 text-sm">
-        <div><label class="label-xs">{{ t('sub_start') }}</label>
-          <input name="start_date" type="date" value="{{ s.start_date }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
-        <div><label class="label-xs">{{ t('sessions_count') }}</label>
-          <input name="sessions_total" type="number" value="{{ s.sessions_total }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
-        <div><label class="label-xs">{{ t('amount') }}</label>
-          <input name="price" type="number" step="0.5" value="{{ s.price }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num focus:border-accent outline-none"></div>
-        <div><label class="label-xs">{{ t('status') }}</label>
-          <select name="status" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 focus:border-accent outline-none">
-            <option value="active" {% if s.status=='active' %}selected{% endif %}>{{ t('sub_active') }}</option>
-            <option value="expired" {% if s.status=='expired' %}selected{% endif %}>{{ t('sub_expired') }}</option>
-            <option value="finished" {% if s.status=='finished' %}selected{% endif %}>{{ t('sub_finished') }}</option>
-          </select></div>
-        <div class="col-span-2 text-[11px] text-faint">{{ t('sub_expiry_auto', d=s.expiry_date) }}</div>
-        <button class="col-span-2 bg-accent text-bg font-semibold rounded-md py-2 mt-1">{{ t('save') }}</button>
-      </form>
-      <form method="post" action="/subscriptions/{{ s.id }}/delete" class="text-center mt-2"
-            onsubmit="return confirm({{ t('confirm_delete_sub')|tojson }})">
-        <input type="hidden" name="drop_payments" value="1">
-        <button class="text-bad text-xs font-medium">{{ t('delete_sub') }}</button>
-      </form>
     </div>
-  </details>
-  {% else %}<div class="px-4 py-3 text-dim text-sm">{{ t('no_subs') }}</div>{% endfor %}
+  </div>
+
+  <div class="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
+    <!-- payments -->
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('payments') }}</h2><span class="meta num">{{ money(pays|sum(attribute='amount')) }} JD</span></div>
+      <div class="rows">
+        {% for pay in pays %}
+        <details>
+          <summary class="row">
+            <span class="num font-bold">{{ money(pay.amount) }} JD</span>
+            <span class="sub">{{ t(pay.method) if pay.method in ['cash','cliq','other'] else pay.method }}</span>
+            <span class="end"><span class="sub">{{ dm(pay.date) }}</span><span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span></span>
+          </summary>
+          <div class="px-4 pb-4 pt-1">
+            <form method="post" action="/payments/{{ pay.id }}/edit" class="grid grid-cols-3 gap-3">
+              <label class="field"><span class="label">{{ t('amount') }}</span><input name="amount" type="number" step="0.5" value="{{ pay.amount }}" class="inp inp-sm num"></label>
+              <label class="field"><span class="label">{{ t('method') }}</span>
+                <select name="method" class="inp inp-sm">
+                  <option value="cash" {% if pay.method=='cash' %}selected{% endif %}>{{ t('cash') }}</option>
+                  <option value="cliq" {% if pay.method=='cliq' %}selected{% endif %}>{{ t('cliq') }}</option>
+                  <option value="other" {% if pay.method=='other' %}selected{% endif %}>{{ t('other') }}</option>
+                </select></label>
+              <label class="field"><span class="label">{{ t('date') }}</span><input name="date" type="date" value="{{ pay.date }}" class="inp inp-sm num"></label>
+              <label class="field col-span-3"><span class="label">{{ t('note') }}</span><input name="note" value="{{ pay.note }}" class="inp inp-sm"></label>
+              <button class="btn btn-ink btn-sm col-span-3">{{ t('save') }}</button>
+            </form>
+            <div class="flex items-center justify-between mt-3">
+              <a class="text-accent text-[13px] font-bold num" href="/receipt/{{ pay.id }}">{{ pay.receipt_no }}</a>
+              <form method="post" action="/payments/{{ pay.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_payment')|tojson }})">
+                <button class="btn btn-danger btn-xs">{{ t('delete_payment') }}</button>
+              </form>
+            </div>
+          </div>
+        </details>
+        {% else %}<div class="empty">{{ t('no_payments') }}</div>{% endfor %}
+      </div>
+    </section>
+
+    <!-- subscriptions -->
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('subscriptions') }}</h2><span class="meta num">{{ subs|length }}</span></div>
+      <div class="rows">
+        {% for s in subs %}
+        <details>
+          <summary class="row">
+            <span dir="ltr" class="num font-semibold text-[13.5px]">{{ dm(s.start_date) }} → {{ dm(s.expiry_date) }}</span>
+            <span class="end">
+              <span class="sub num">{{ s.sessions_used }}/{{ s.sessions_total }} · {{ money(s.price) }} JD</span>
+              <span class="tag {{ 'tag-ok' if s.status=='active' else 'tag-mute' }}">{{ t('sub_' ~ s.status) }}</span>
+              <span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span>
+            </span>
+          </summary>
+          <div class="px-4 pb-4 pt-1">
+            <form method="post" action="/subscriptions/{{ s.id }}/edit" class="grid grid-cols-3 gap-3">
+              <label class="field"><span class="label">{{ t('sub_start') }}</span><input name="start_date" type="date" value="{{ s.start_date }}" class="inp inp-sm num"></label>
+              <label class="field"><span class="label">{{ t('sessions_count') }}</span><input name="sessions_total" type="number" min="1" value="{{ s.sessions_total }}" class="inp inp-sm num"></label>
+              <label class="field"><span class="label">{{ t('p_price') }}</span><input name="price" type="number" step="0.5" value="{{ s.price }}" class="inp inp-sm num"></label>
+              <div class="col-span-3 sub">{{ t('sub_expiry_auto', d=s.expiry_date) }}</div>
+              <button class="btn btn-ink btn-sm col-span-3">{{ t('save') }}</button>
+            </form>
+            <form method="post" action="/subscriptions/{{ s.id }}/delete" class="mt-3 text-end" onsubmit="return confirm({{ t('confirm_delete_sub')|tojson }})">
+              <input type="hidden" name="drop_payments" value="1">
+              <button class="btn btn-danger btn-xs">{{ t('delete_sub') }}</button>
+            </form>
+          </div>
+        </details>
+        {% else %}<div class="empty">{{ t('no_subs') }}</div>{% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
+    <!-- attendance log -->
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('attendance_log') }}</h2>
+        {% if att_stats.rate is not none %}<span class="meta num">{{ t('att_breakdown', p=att_stats.present, a=att_stats.absent, e=att_stats.excused) }}</span>{% endif %}</div>
+      <div class="rows">
+        {% for a in att %}
+        <div class="row" style="min-height:42px">
+          <span class="text-[13.5px]">{{ dm(a.session_date) }} <span class="sub num">{{ a.session_date[:4] }}</span></span>
+          <span class="end">
+            {% if 'trial' in a.keys() and a.trial %}<span class="tag tag-acc">{{ t('trial_tag') }}</span>{% endif %}
+            {% if a.unpaid %}<span class="tag tag-bad">{{ t('unpaid_tag') }}</span>{% endif %}
+            <span class="flex items-center gap-1.5 font-semibold text-[13.5px] {{ 'text-ok' if a.status=='present' else ('text-warn' if a.status=='excused' else 'text-dim') }}">
+              {{ icon('check','w-3.5 h-3.5') if a.status=='present' else (icon('minus','w-3.5 h-3.5') if a.status=='excused' else icon('x','w-3.5 h-3.5')) }}{{ t('att_' ~ a.status) }}</span>
+          </span>
+        </div>
+        {% else %}<div class="empty">{{ t('no_att') }}</div>{% endfor %}
+      </div>
+    </section>
+
+    <!-- freezes -->
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('p_freezes') }}</h2></div>
+      <div class="rows">
+        {% for f in freezes %}
+        <div class="row" style="min-height:42px">
+          <span dir="ltr" class="num text-[13.5px]">{{ f.start_date }} → {{ f.end_date or '…' }}</span>
+          <span class="end">{% if f.end_date %}<span class="tag tag-mute">{{ t('p_freeze_ended') }}</span>{% else %}<span class="tag tag-acc">{{ t('p_freeze_ongoing') }}</span>{% endif %}</span>
+        </div>
+        {% else %}<div class="empty">{{ t('p_no_freezes') }}</div>{% endfor %}
+      </div>
+      <div class="sheet-ft sub">{{ t('p_freeze_hint') }}</div>
+    </section>
+  </div>
 </div>
 
-<h2 class="label-xs mb-2">{{ t('att_rate') }}</h2>
-<div class="bg-card rounded-lg border border-edge p-4 mb-5">
-  {% if att_stats.rate is not none %}
-  <div class="flex items-end justify-between mb-2">
-    <div class="text-3xl font-bold num {{ 'text-ok' if att_stats.rate >= 75 else ('text-warn' if att_stats.rate >= 50 else 'text-bad') }}">{{ att_stats.rate }}%</div>
-    {% if att_stats.streak >= 2 %}<div class="text-sm text-ok font-semibold">{{ t('att_streak', n=att_stats.streak) }}</div>{% endif %}
+<!-- renew sheet -->
+<div id="renewSheet" class="ovl" role="dialog" aria-modal="true" aria-labelledby="renewTitle">
+  <div class="panel">
+    <div class="panel-hd"><h3 id="renewTitle">{{ t('renew_title') }}</h3>
+      <button onclick="closeSheet('renewSheet')" class="btn btn-line btn-sm btn-icon ms-auto" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+    <div class="panel-bd grid gap-4">
+      {% if settings.bundles %}
+      <div class="chips" role="group" aria-label="{{ t('bundle') }}">
+        {% for b in settings.bundles %}
+        <button type="button" class="da-tab bundle-opt {{ 'on' if loop.first }}" data-price="{{ b.price }}" data-sessions="{{ b.sessions }}">
+          {{ b.name_ar if lang == 'ar' else b.name_en }}<span class="n num">{{ b.sessions }} · {{ b.price }} JD</span></button>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="grid grid-cols-3 gap-3">
+        <label class="field"><span class="label">{{ t('p_price') }}</span>
+          <input id="rPrice" type="number" step="0.5" min="0" class="inp num" value="{{ settings.bundles[0].price if settings.bundles else settings.monthly_price }}"></label>
+        <label class="field"><span class="label">{{ t('p_paid_now') }}</span>
+          <input id="rPaid" type="number" step="0.5" min="0" class="inp num" value="{{ settings.bundles[0].price if settings.bundles else settings.monthly_price }}"></label>
+        <label class="field"><span class="label">{{ t('sessions_count') }}</span>
+          <input id="rSessions" type="number" min="1" class="inp num" value="{{ settings.bundles[0].sessions if settings.bundles else settings.sessions_per_month }}"></label>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="field"><span class="label">{{ t('p_start_date') }}</span>
+          <input id="rStart" type="date" class="inp num" value="{{ suggested_start }}"></label>
+        <label class="field"><span class="label">{{ t('p_pay_date') }}</span>
+          <input id="rPayDate" type="date" class="inp num" value="{{ today }}" max="{{ today }}"></label>
+      </div>
+      <label class="field"><span class="label">{{ t('method') }}</span>
+        <select id="rMethod" class="inp"><option value="cash">{{ t('cash') }}</option><option value="cliq">{{ t('cliq') }}</option><option value="other">{{ t('other') }}</option></select></label>
+      <div class="sheet px-3 py-2.5 text-[13.5px] grid gap-1" style="background:rgb(var(--sheet-2))">
+        <div id="rPreview" class="num font-semibold"></div>
+        <div id="rBack" class="text-warn hidden">{{ t('p_backdated') }}</div>
+        <div id="rOwe" class="text-warn"></div>
+      </div>
+      <div class="flex gap-2">
+        <button id="rGo" onclick="renew()" class="btn btn-ink flex-1">{{ t('confirm_received') }}</button>
+        <button onclick="closeSheet('renewSheet')" class="btn btn-line">{{ t('cancel') }}</button>
+      </div>
+    </div>
   </div>
-  <div class="w-full h-2 rounded-full bg-card3 overflow-hidden mb-2">
-    <div class="h-full {{ 'bg-emerald-500' if att_stats.rate >= 75 else ('bg-amber-500' if att_stats.rate >= 50 else 'bg-red-500') }}" style="width: {{ att_stats.rate }}%"></div>
-  </div>
-  <div class="text-xs text-dim num">{{ t('att_breakdown', p=att_stats.present, a=att_stats.absent, e=att_stats.excused) }}</div>
-  {% else %}
-  <div class="text-sm text-dim">{{ t('att_none_yet') }}</div>
-  {% endif %}
 </div>
 
-<h2 class="label-xs mb-2">{{ t('attendance_log') }}</h2>
-<div class="bg-card rounded-lg border border-edge divide-y divide-edge2 mb-6">
-  {% for a in att %}
-  <div class="px-4 py-2.5 flex justify-between text-sm">
-    <div class="num">{{ a.session_date }}</div>
-    <div class="flex items-center gap-1.5
-      {{ 'text-ok' if a.status=='present' else ('text-warn' if a.status=='excused' else 'text-dim') }}">
-      {{ icon('check','w-3.5 h-3.5') if a.status=='present' else (icon('minus','w-3.5 h-3.5') if a.status=='excused' else icon('x','w-3.5 h-3.5')) }}
-      {{ t('att_' ~ a.status) }}
-      {% if 'trial' in a.keys() and a.trial %}<span class="pill pill-sky">{{ t('trial_tag') }}</span>{% endif %}
-      {% if a.unpaid %}<span class="text-bad text-xs">· {{ t('unpaid_tag') }}</span>{% endif %}</div>
+<!-- payment sheet -->
+<div id="paySheet" class="ovl" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+  <div class="panel">
+    <div class="panel-hd"><h3 id="payTitle">{{ t('p_record_payment') }}</h3>
+      <button onclick="closeSheet('paySheet')" class="btn btn-line btn-sm btn-icon ms-auto" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+    <div class="panel-bd grid gap-4">
+      <div class="sub">{% if balance > 0 %}{{ t('p_pay_hint_owes', n=money(balance)) }}{% else %}{{ t('p_pay_hint_none') }}{% endif %}</div>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="field"><span class="label">{{ t('amount') }}</span>
+          <input id="pAmount" type="number" step="0.5" min="0" class="inp num" value="{{ balance if balance > 0 else '' }}"></label>
+        <label class="field"><span class="label">{{ t('p_pay_date') }}</span>
+          <input id="pDate" type="date" class="inp num" value="{{ today }}" max="{{ today }}"></label>
+        <label class="field"><span class="label">{{ t('method') }}</span>
+          <select id="pMethod" class="inp"><option value="cash">{{ t('cash') }}</option><option value="cliq">{{ t('cliq') }}</option><option value="other">{{ t('other') }}</option></select></label>
+        <label class="field"><span class="label">{{ t('note') }}</span><input id="pNote" class="inp"></label>
+      </div>
+      <div class="flex gap-2">
+        <button id="pGo" onclick="pay()" class="btn btn-ink flex-1">{{ t('p_save_payment') }}</button>
+        <button onclick="closeSheet('paySheet')" class="btn btn-line">{{ t('cancel') }}</button>
+      </div>
+    </div>
   </div>
-  {% else %}<div class="px-4 py-3 text-dim text-sm">{{ t('no_att') }}</div>{% endfor %}
 </div>
 
-<!-- renewal modal -->
-<div id="renewModal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-3">
-  <div class="bg-card rounded-lg p-5 w-full max-w-md border border-edge">
-    <h3 class="font-bold text-lg mb-3">{{ t('renew_title') }}</h3>
-    <label class="label-xs mb-1.5 block">{{ t('bundle') }}</label>
-    <div class="grid grid-cols-3 gap-2 mb-3">
-      {% for b in settings.bundles %}
-      <button type="button" onclick="pickBundle({{ b.price }}, {{ b.sessions }}, this)"
-              class="bundle-opt bg-bg border border-edge rounded-md px-2 py-2.5 text-center transition hover:border-accent/60"
-              data-i="{{ loop.index0 }}">
-        <div class="font-bold text-sm truncate">{{ b.name_ar if lang == 'ar' else b.name_en }}</div>
-        <div class="text-[11px] text-dim num">{{ b.sessions }} · {{ b.price }} JD</div>
-      </button>
-      {% endfor %}
-    </div>
-    <div class="grid grid-cols-2 gap-2 mb-3">
-      <div><label class="label-xs" for="rAmount">{{ t('amount') }}</label>
-        <input id="rAmount" type="number" step="0.5" value="{{ settings.bundles[0].price if settings.bundles else settings.monthly_price }}"
-               class="w-full bg-bg border border-edge rounded-md px-3 py-2.5 mt-1 num focus:border-accent outline-none" /></div>
-      <div><label class="label-xs" for="rSessions">{{ t('sessions_count') }}</label>
-        <input id="rSessions" type="number" value="{{ settings.bundles[0].sessions if settings.bundles else settings.sessions_per_month }}"
-               class="w-full bg-bg border border-edge rounded-md px-3 py-2.5 mt-1 num focus:border-accent outline-none" /></div>
-    </div>
-    <label class="label-xs" for="rMethod">{{ t('method') }}</label>
-    <select id="rMethod" class="w-full bg-bg border border-edge rounded-lg px-3 py-3 mt-1 mb-3 focus:border-accent outline-none">
-      <option value="cash">{{ t('cash') }}</option>
-      <option value="cliq">{{ t('cliq') }}</option>
-      <option value="other">{{ t('other') }}</option>
-    </select>
-    {% if prev_expiry %}
-    <label class="flex items-center gap-2 text-sm mb-3 bg-bg rounded-lg px-3 py-3 border border-edge">
-      <input type="checkbox" id="rAfterExpiry" checked class="accent-accent">
-      {{ t('start_after_expiry', d=prev_expiry) }}
-    </label>
-    {% endif %}
-    <div class="flex gap-2">
-      <button onclick="renew()" class="flex-1 bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('confirm_received') }}</button>
-      <button onclick="document.getElementById('renewModal').classList.add('hidden')" class="px-4 bg-card2 hover:bg-card3 border border-edge rounded-lg transition">{{ t('cancel') }}</button>
+<!-- freeze / unfreeze sheet -->
+{% for kind in ['freeze', 'unfreeze'] %}
+<div id="{{ kind }}Sheet" class="ovl" role="dialog" aria-modal="true" aria-labelledby="{{ kind }}Title">
+  <div class="panel">
+    <div class="panel-hd"><h3 id="{{ kind }}Title">{{ t(kind) }}</h3>
+      <button onclick="closeSheet('{{ kind }}Sheet')" class="btn btn-line btn-sm btn-icon ms-auto" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+    <div class="panel-bd grid gap-4">
+      <div class="sub">{{ t('p_' ~ kind ~ '_explain') }}</div>
+      <label class="field"><span class="label">{{ t('p_' ~ kind ~ '_from') }}</span>
+        <input id="{{ kind }}Date" type="date" class="inp num" value="{{ today }}" max="{{ today }}"></label>
+      <div class="flex gap-2">
+        <button onclick="act('{{ kind }}')" class="btn btn-ink flex-1">{{ t(kind) }}</button>
+        <button onclick="closeSheet('{{ kind }}Sheet')" class="btn btn-line">{{ t('cancel') }}</button>
+      </div>
     </div>
   </div>
 </div>
+{% endfor %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-const RENEWED_OK = {{ t('renewed_ok')|tojson }};
-async function act(what) {
-  await fetch(`/api/players/{{ p.id }}/${what}`, {method:'POST'});
-  location.reload();
+const PID = {{ p.id }}, TODAY = {{ today|tojson }};
+const LOCALE = {{ lang|tojson }} === 'ar' ? 'ar-JO' : 'en-GB';
+const T = { renewed: {{ t('renewed_ok')|tojson }}, saved: {{ t('p_saved')|tojson }}, preview: {{ t('p_preview')|tojson }},
+            owe: {{ t('p_will_owe')|tojson }}, err: {{ t('save_error')|tojson }}, amount: {{ t('p_enter_amount')|tojson }}, paid: {{ t('p_payment_ok')|tojson }} };
+const $ = id => document.getElementById(id);
+const fmt = iso => new Date(iso + 'T12:00:00').toLocaleDateString(LOCALE, {day:'numeric', month:'short'});
+async function post(url, body) {
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body || {})});
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
 }
-function pickBundle(price, sessions, el) {
-  document.getElementById('rAmount').value = price;
-  document.getElementById('rSessions').value = sessions;
-  document.querySelectorAll('.bundle-opt').forEach(b => b.classList.remove('on'));
-  el.classList.add('on');
+async function act(kind) {
+  try { await post(`/api/players/${PID}/${kind}`, {date: $(kind + 'Date').value}); location.reload(); }
+  catch (e) { toast(T.err); }
 }
+// renew sheet
+let pv, paidTouched = false;
+function preview() {
+  clearTimeout(pv);
+  pv = setTimeout(async () => {
+    const n = parseInt($('rSessions').value) || 0, s = $('rStart').value;
+    $('rBack').classList.toggle('hidden', !(s && s < TODAY));
+    if (!n || !s) { $('rPreview').textContent = ''; return; }
+    try {
+      const d = await (await fetch(`/api/sub-preview?start=${s}&sessions=${n}`)).json();
+      $('rPreview').textContent = d.first ? T.preview.replace('{n}', d.count).replace('{a}', fmt(d.first)).replace('{b}', fmt(d.end)) : '';
+    } catch (e) {}
+  }, 150);
+}
+function owe() {
+  const left = (parseFloat($('rPrice').value) || 0) - (parseFloat($('rPaid').value) || 0);
+  $('rOwe').textContent = left > 0 ? T.owe.replace('{n}', Math.round(left * 100) / 100) : '';
+}
+document.querySelectorAll('#renewSheet .bundle-opt').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#renewSheet .bundle-opt').forEach(x => x.classList.toggle('on', x === b));
+  $('rPrice').value = b.dataset.price; $('rPaid').value = b.dataset.price; $('rSessions').value = b.dataset.sessions;
+  paidTouched = false; preview(); owe();
+}));
+$('rPaid').addEventListener('input', () => { paidTouched = true; owe(); });
+$('rPrice').addEventListener('input', () => { if (!paidTouched) $('rPaid').value = $('rPrice').value; owe(); });
+['rSessions', 'rStart'].forEach(id => $(id).addEventListener('input', preview));
+preview(); owe();
 async function renew() {
-  const afterExpiry = document.getElementById('rAfterExpiry');
-  const body = {
-    amount: parseFloat(document.getElementById('rAmount').value || '{{ settings.monthly_price }}'),
-    price: parseFloat(document.getElementById('rAmount').value || '{{ settings.monthly_price }}'),
-    sessions_total: parseInt(document.getElementById('rSessions').value || '{{ settings.sessions_per_month }}'),
-    method: document.getElementById('rMethod').value,
-    start_date: (afterExpiry && afterExpiry.checked) ? '{{ prev_expiry }}' : '{{ today }}'
-  };
-  const r = await fetch(`/api/players/{{ p.id }}/renew`, {
-    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-  const d = await r.json();
-  if (d.ok) { alert(RENEWED_OK + d.receipt_no); location.reload(); }
+  const price = parseFloat($('rPrice').value), paid = parseFloat($('rPaid').value);
+  $('rGo').disabled = true;
+  try {
+    const d = await post(`/api/players/${PID}/renew`, {
+      price: isNaN(price) ? null : price, amount: isNaN(paid) ? 0 : paid,
+      sessions_total: parseInt($('rSessions').value) || null, method: $('rMethod').value,
+      start_date: $('rStart').value, pay_date: $('rPayDate').value });
+    closeSheet('renewSheet');
+    toast(d.receipt_no ? T.renewed + d.receipt_no : T.saved);
+    setTimeout(() => location.replace(location.pathname), 900);
+  } catch (e) { toast(T.err); $('rGo').disabled = false; }
 }
+async function pay() {
+  const amount = parseFloat($('pAmount').value);
+  if (!(amount > 0)) { toast(T.amount); return; }
+  $('pGo').disabled = true;
+  try {
+    const d = await post(`/api/players/${PID}/pay`, {amount, pay_date: $('pDate').value, method: $('pMethod').value, note: $('pNote').value});
+    closeSheet('paySheet'); toast(T.paid + d.receipt_no);
+    setTimeout(() => location.reload(), 900);
+  } catch (e) { toast(T.err); $('pGo').disabled = false; }
+}
+if (location.hash === '#renew') openSheet('renewSheet');
 </script>
 {% endblock %}

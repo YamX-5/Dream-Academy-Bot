@@ -15,3 +15,6 @@ cloudflared.exe
 .claude/
 Thumbs.db
 config.yml
+
+# design review captures (local only)
+.impeccable/review/

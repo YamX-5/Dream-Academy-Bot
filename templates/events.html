@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% from "_ui.html" import money, dmon %}
+{% block title %}{{ t('nav_events') }}{% endblock %}
+
+{% macro event_form(e) %}
+<form method="post" action="/events/save" class="grid gap-3">
+  {% if e %}<input type="hidden" name="id" value="{{ e.id }}">{% endif %}
+  <label class="field"><span class="label">{{ t('e_title') }}</span>
+    <input name="title" required value="{{ e.title if e else '' }}" class="inp" placeholder="{{ t('e_title_ph') }}"></label>
+  <div class="grid grid-cols-2 gap-3">
+    <label class="field"><span class="label">{{ t('e_kind') }}</span>
+      <select name="kind" class="inp">
+        {% for k in kinds %}<option value="{{ k }}" {% if e and e.kind == k %}selected{% endif %}>{{ t('e_kind_' ~ k) }}</option>{% endfor %}
+      </select></label>
+    <label class="field"><span class="label">{{ t('e_partner') }}</span>
+      <input name="partner" value="{{ e.partner if e else '' }}" class="inp" placeholder="{{ t('e_partner_ph') }}"></label>
+  </div>
+  <label class="field"><span class="label">{{ t('e_location') }}</span>
+    <input name="location" value="{{ e.location if e else '' }}" class="inp" placeholder="{{ t('e_location_ph') }}"></label>
+  <div class="grid grid-cols-3 gap-3">
+    <label class="field"><span class="label">{{ t('date') }}</span>
+      <input name="date" type="date" required value="{{ e.date if e else today }}" class="inp num"></label>
+    <label class="field"><span class="label">{{ t('e_from') }}</span>
+      <input name="start_time" type="time" value="{{ e.start_time if e else '' }}" class="inp num"></label>
+    <label class="field"><span class="label">{{ t('e_to') }}</span>
+      <input name="end_time" type="time" value="{{ e.end_time if e else '' }}" class="inp num"></label>
+  </div>
+  <label class="field"><span class="label">{{ t('e_amount') }}</span>
+    <input name="amount" type="number" step="0.5" min="0" value="{{ e.amount if e and e.amount is not none else '' }}" class="inp num" placeholder="{{ t('e_amount_ph') }}"></label>
+  <label class="field"><span class="label">{{ t('note') }}</span>
+    <textarea name="notes" rows="2" class="inp">{{ e.notes if e else '' }}</textarea></label>
+  <button class="btn btn-ink btn-block">{{ t('save') }}</button>
+</form>
+{% endmacro %}
+
+{% macro event_row(e, faded=False) %}
+<details class="{{ 'opacity-70' if faded }}">
+  <summary class="row items-start">
+    <div class="w-12 shrink-0 text-center border border-edge rounded py-1.5">
+      <div class="mid num !text-[19px] leading-none">{{ e.date[8:10] }}</div>
+      <div class="label !text-[10px] mt-1">{{ dmon(e.date, lang).split(' ', 1)[1] }}</div>
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="font-bold">{{ e.title }}</div>
+      <div class="sub mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span class="tag tag-acc">{{ t('e_kind_' ~ (e.kind or 'other')) }}</span>
+        {% if e.partner %}<span class="font-semibold text-ink">{{ e.partner }}</span>{% endif %}
+        {% if e.start_time %}<span class="num">{{ e.start_time }}{% if e.end_time %}-{{ e.end_time }}{% endif %}</span>{% endif %}
+        {% if e.location %}<span>{{ e.location }}</span>{% endif %}
+        {% if e.amount %}<span class="num font-semibold text-ok">{{ money(e.amount) }} JD</span>{% endif %}
+      </div>
+      {% if e.notes %}<div class="sub mt-1.5 whitespace-pre-line">{{ e.notes }}</div>{% endif %}
+    </div>
+    {% if role == 'admin' %}<span class="text-faint shrink-0 mt-1">{{ icon('edit','w-4 h-4') }}</span>{% endif %}
+  </summary>
+  {% if role == 'admin' %}
+  <div class="sheet-bd border-t border-edge2">
+    {{ event_form(e) }}
+    <form method="post" action="/events/{{ e.id }}/delete" class="text-center mt-3" onsubmit="return confirm({{ t('e_confirm_delete')|tojson }})">
+      <button class="btn btn-danger btn-sm">{{ t('delete') }}</button>
+    </form>
+  </div>
+  {% endif %}
+</details>
+{% endmacro %}
+
+{% block content %}
+<div class="stack">
+  <div class="flex items-end gap-3 flex-wrap">
+    <div class="min-w-0">
+      <h1 class="h-page">{{ t('nav_events') }}</h1>
+      <div class="sub mt-1">{{ t('e_sub') }}</div>
+    </div>
+    {% if role == 'admin' %}
+    <button class="btn btn-ink btn-sm ms-auto" onclick="openSheet('addEvent')">{{ icon('plus','w-4 h-4') }}{{ t('e_add') }}</button>
+    {% endif %}
+  </div>
+
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('e_upcoming') }}</h2><span class="meta num">{{ upcoming|length }}</span></div>
+    <div class="rows">
+      {% for e in upcoming %}{{ event_row(e) }}{% else %}<div class="empty">{{ t('e_none') }}</div>{% endfor %}
+    </div>
+  </section>
+
+  {% if past %}
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('e_past') }}</h2></div>
+    <div class="rows">{% for e in past %}{{ event_row(e, True) }}{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+
+{% if role == 'admin' %}
+<div id="addEvent" class="ovl">
+  <div class="panel">
+    <div class="panel-hd"><h3>{{ t('e_add') }}</h3>
+      <button class="btn btn-line btn-sm btn-icon ms-auto" onclick="closeSheet('addEvent')" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+    <div class="panel-bd">{{ event_form(none) }}</div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

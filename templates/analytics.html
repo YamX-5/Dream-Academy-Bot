@@ -1,145 +1,169 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_ui.html" import money %}
+
+{# Single-series column chart, scoresheet style. data: [{d, v}] #}
+{% macro bars(data, cls='c-ink', vmax=none, unit='') %}
+{% set n = data|length %}
+{% set top = vmax or [data|map(attribute='v')|max if n else 0, 1]|max %}
+{% set step = 290 / ([n, 1]|max) %}
+<svg viewBox="0 0 320 132" class="w-full h-auto max-h-[190px] block mx-auto" role="img" dir="ltr">
+  {% for g in [0, 0.5, 1] %}
+  <line class="c-grid" x1="28" x2="318" y1="{{ 10 + 100 * (1 - g) }}" y2="{{ 10 + 100 * (1 - g) }}"/>
+  <text class="c-lbl" x="24" y="{{ 13 + 100 * (1 - g) }}" text-anchor="end">{{ money(top * g) }}</text>
+  {% endfor %}
+  {% for p in data %}
+  {% set h = 100 * (p.v or 0) / top %}{% set w = [step * 0.5, 22]|min %}
+  {% set x = 28 + step * loop.index0 + (step - w) / 2 %}
+  <rect class="{{ cls }}" x="{{ x }}" y="{{ 110 - h }}" width="{{ w }}" height="{{ h }}"><title>{{ p.d }} · {{ money(p.v) }}{{ unit }}</title></rect>
+  <text class="c-lbl" x="{{ x + w / 2 }}" y="124" text-anchor="middle">{{ p.d }}</text>
+  {% else %}
+  <text class="c-lbl" x="170" y="64" text-anchor="middle">-</text>
+  {% endfor %}
+</svg>
+{% endmacro %}
+
 {% block title %}{{ t('analytics_title') }}{% endblock %}
-{% block content %}
-{% set pal = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
-<h1 class="text-xl font-bold text-ink mb-4 flex items-center gap-2">
-  <span class="text-accent">{{ icon('analytics','w-5 h-5') }}</span>{{ t('analytics_title') }}
-</h1>
-
-<!-- KPI strip -->
-<div class="grid grid-cols-2 gap-2.5 mb-5">
-  <div class="kpi bg-card rounded-xl p-4 border border-edge">
-    <div class="label-xs mb-1">{{ t('an_total') }}</div>
-    <div class="text-2xl font-extrabold num text-ink">{{ kpi.total }}</div>
-  </div>
-  <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
-    <div class="label-xs mb-1">{{ t('an_active') }}</div>
-    <div class="text-2xl font-extrabold num text-ink">{{ kpi.active }}</div>
-  </div>
-  <div class="kpi {{ 'kpi-ok' if kpi.rate >= 75 else ('kpi-warn' if kpi.rate >= 50 else 'kpi-bad') }} bg-card rounded-xl p-4 border border-edge">
-    <div class="label-xs mb-1">{{ t('an_rate') }}</div>
-    <div class="text-2xl font-extrabold num {{ 'text-ok' if kpi.rate >= 75 else ('text-warn' if kpi.rate >= 50 else 'text-bad') }}">{{ kpi.rate }}%</div>
-  </div>
-  <div class="kpi kpi-ok bg-card rounded-xl p-4 border border-edge">
-    <div class="label-xs mb-1">{{ t('an_revenue') }}</div>
-    <div class="text-2xl font-extrabold num text-ok">{{ kpi.revenue }}<span class="text-sm font-semibold"> JD</span></div>
-  </div>
-</div>
-
-<!-- AI insights -->
-<h2 class="flex items-center gap-2 font-bold mb-2.5 text-ink">
-  <span class="text-accent">{{ icon('sparkle','w-4 h-4') }}</span>{{ t('an_ai_insights') }}
-</h2>
-<div class="space-y-2 mb-6">
-  {% for ins in insights %}
-  {% set c = {'ok':'ok','warn':'warn','bad':'bad','muted':'dim'}[ins.tone] %}
-  <div class="bg-card rounded-xl border border-edge p-3.5 flex items-start gap-3">
-    <span class="w-8 h-8 rounded-lg grid place-items-center shrink-0 text-{{ c }}" style="background:rgba(143,205,240,.08)">
-      {{ icon('trend-up' if ins.tone in ['ok'] else ('alert' if ins.tone in ['warn','bad'] else 'sparkle'),'w-4 h-4') }}
-    </span>
-    <div class="text-sm leading-relaxed pt-0.5">{{ ins.text }}</div>
-  </div>
-  {% endfor %}
-</div>
-
-<!-- at-risk -->
-{% if at_risk %}
-<h2 class="flex items-center gap-2 font-bold mb-1 text-ink">
-  <span class="text-bad">{{ icon('alert','w-4 h-4') }}</span>{{ t('an_at_risk') }}
-</h2>
-<div class="text-xs text-dim mb-2.5">{{ t('an_at_risk_sub') }}</div>
-<div class="gr-col bad mb-6">
-  <div class="hd"><span class="dot"></span><span class="t">{{ t('an_at_risk') }}</span><span class="cnt num">{{ at_risk|length }}</span></div>
-  {% for r in at_risk %}
-  {% set pp = r.name.split() %}
-  <a href="/players/{{ r.id }}" class="gr-row">
-    <span class="av" style="background: {{ pal[r.id % 6] }}">{{ pp[0][0] }}{{ pp[1][0] if pp|length > 1 else '' }}</span>
-    <div class="flex-1 min-w-0"><div class="font-bold text-sm truncate">{{ r.name }}</div></div>
-    <span class="pill pill-bad num">{{ r.rate }}%</span>
-  </a>
-  {% endfor %}
-</div>
-{% endif %}
-
-<!-- finance -->
-<h2 class="flex items-center gap-2 font-bold mb-2 text-ink"><span class="text-accent">{{ icon('wallet','w-4 h-4') }}</span>{{ t('finance_title') }}
-  <a href="/finance" class="text-xs text-accent font-semibold ms-auto">{{ t('nav_finance') }} →</a></h2>
-<div class="grid grid-cols-2 gap-2 mb-3">
-  <div class="kpi kpi-ok bg-card rounded-lg p-3 border border-edge"><div class="label-xs mb-0.5">{{ t('fin_revenue') }}</div><div class="text-lg font-extrabold num text-ok">{{ fin.revenue }} JD</div></div>
-  <div class="kpi kpi-bad bg-card rounded-lg p-3 border border-edge"><div class="label-xs mb-0.5">{{ t('fin_expenses') }}</div><div class="text-lg font-extrabold num text-bad">{{ fin.expenses }} JD</div></div>
-  <div class="kpi {{ 'kpi-ok' if fin.profit >= 0 else 'kpi-bad' }} bg-card rounded-lg p-3 border border-edge"><div class="label-xs mb-0.5">{{ t('fin_profit') }}</div><div class="text-lg font-extrabold num {{ 'text-ok' if fin.profit >= 0 else 'text-bad' }}">{{ fin.profit }} JD</div></div>
-  <div class="kpi bg-card rounded-lg p-3 border border-edge"><div class="label-xs mb-0.5">{{ t('fin_margin') }}</div><div class="text-lg font-extrabold num">{{ fin.margin if fin.margin is not none else '—' }}{% if fin.margin is not none %}%{% endif %}</div></div>
-</div>
-<div class="bg-card rounded-xl p-4 border border-edge mb-6">
-  <div class="flex items-center gap-4 mb-2">
-    <div class="label-xs">{{ t('an_chart_finance') }}</div>
-    <span class="text-[11px] flex items-center gap-1 text-ok"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#1A9B4F"></span>{{ t('fin_revenue') }}</span>
-    <span class="text-[11px] flex items-center gap-1 text-bad"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#DC3830"></span>{{ t('fin_expenses') }}</span>
-    <span class="text-[11px] flex items-center gap-1 text-accent"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#5FB0DE"></span>{{ t('fin_profit') }}</span>
-  </div>
-  <canvas id="finChart" height="140"></canvas>
-</div>
-
-<!-- charts -->
-<h2 class="font-bold mb-2 text-ink">{{ t('charts') }}</h2>
-<div class="space-y-3 mb-6">
-  <div class="bg-card rounded-xl p-4 border border-edge">
-    <div class="label-xs mb-2">{{ t('an_chart_rate') }}</div>
-    <canvas id="rateChart" height="130"></canvas>
-  </div>
-  <div class="bg-card rounded-xl p-4 border border-edge">
-    <div class="label-xs mb-2">{{ t('an_chart_rev') }}</div>
-    <canvas id="revChart" height="130"></canvas>
-  </div>
-  <div class="bg-card rounded-xl p-4 border border-edge">
-    <div class="label-xs mb-3">{{ t('an_chart_groups') }}</div>
-    {% for g in grp_chart %}
-    <div class="flex items-center gap-3 mb-2.5">
-      <div class="w-20 text-xs text-dim truncate shrink-0">{{ g.d }}</div>
-      <div class="flex-1 h-3 rounded-full bg-card3 overflow-hidden">
-        <div class="h-full rounded-full" style="width: {{ g.rate }}%; background:linear-gradient(90deg,var(--acc),var(--acc2))"></div>
-      </div>
-      <div class="w-14 text-end text-xs num {{ 'text-dim' if g.players == 0 }}">{{ g.rate }}%</div>
-    </div>
-    {% endfor %}
-  </div>
-  <div class="bg-card rounded-xl p-4 border border-edge">
-    <div class="label-xs mb-2">{{ t('an_chart_new') }}</div>
-    <canvas id="newChart" height="130"></canvas>
-  </div>
-</div>
+{% block head %}
+<style>
+  .m-led4 > div:nth-child(n+3) { border-top:1px solid rgb(var(--rule)); }
+  .m-led4 > div:nth-child(3) { border-inline-start:0; }
+  @media (min-width:1024px){
+    .m-led4 { --cols:4 !important; }
+    .m-led4 > div:nth-child(n+3) { border-top:0; }
+    .m-led4 > div:nth-child(3) { border-inline-start:1px solid rgb(var(--rule)); }
+  }
+  .c-ink { fill:rgb(var(--ink-2)); } .c-acc { fill:rgb(var(--acc)); } .c-bad { fill:rgb(var(--bad) / .75); } .c-ok { fill:rgb(var(--ok)); }
+  .c-grid { stroke:rgb(var(--rule)); stroke-width:1; } .c-zero { stroke:rgb(var(--rule-strong)); stroke-width:1; }
+  .c-lbl { fill:rgb(var(--muted)); font-size:11px; font-family:Montserrat,sans-serif; }
+  .c-line { fill:none; stroke:rgb(var(--acc)); stroke-width:2; } .c-pt { fill:rgb(var(--sheet)); stroke:rgb(var(--acc)); stroke-width:2; }
+  .swatch { width:10px; height:10px; border-radius:1px; display:inline-block; }
+</style>
 {% endblock %}
 
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script>
-const css = getComputedStyle(document.documentElement);
-const AXIS = 'rgb(' + css.getPropertyValue('--dim').trim() + ')';
-const GRID = 'rgb(' + css.getPropertyValue('--edge').trim() + ' / .5)';
-const opts = (max) => ({ plugins:{legend:{display:false},tooltip:{enabled:true}}, scales:{
-  x:{ticks:{color:AXIS,font:{size:10}},grid:{display:false}},
-  y:{ticks:{color:AXIS,font:{size:10}},grid:{color:GRID},beginAtZero:true,max:max}}});
-function mk(id,type,data,color,max){
-  new Chart(document.getElementById(id),{type,
-    data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:color,borderColor:color,
-      tension:.35,borderRadius:6,fill:false,maxBarThickness:38,categoryPercentage:.6,barPercentage:.7,
-      pointRadius:type==='line'?3:0,pointBackgroundColor:color,borderWidth:type==='line'?2.5:0}]},
-    options:opts(max)});}
-mk('rateChart','line',{{ att_chart|tojson }},'#5FB0DE',100);
-mk('revChart','bar',{{ rev_chart|tojson }},'#1A9B4F');
-mk('newChart','bar',{{ new_chart|tojson }},'#5FB0DE');
+{% block content %}
+<div class="stack">
+  <h1 class="h-page">{{ t('analytics_title') }}</h1>
 
-// grouped revenue vs expenses vs profit
-const F = {{ fin_months|tojson }};
-new Chart(document.getElementById('finChart'), { type:'bar',
-  data:{ labels:F.map(f=>f.d), datasets:[
-    {label:'Revenue', data:F.map(f=>f.rev), backgroundColor:'#1A9B4F', borderRadius:5, maxBarThickness:16},
-    {label:'Expenses', data:F.map(f=>f.exp), backgroundColor:'#DC3830', borderRadius:5, maxBarThickness:16},
-    {label:'Profit', data:F.map(f=>f.profit), backgroundColor:'#5FB0DE', borderRadius:5, maxBarThickness:16},
-  ]},
-  options:{ plugins:{legend:{display:false}}, scales:{
-    x:{ticks:{color:AXIS,font:{size:10}},grid:{display:false}},
-    y:{ticks:{color:AXIS,font:{size:10}},grid:{color:GRID}}}}});
-</script>
+  <section class="sheet">
+    <div class="ledger m-led4" style="--cols:2">
+      <div><div class="k">{{ t('an_total') }}</div><div class="v mid num">{{ kpi.total }}</div></div>
+      <div><div class="k">{{ t('an_active') }}</div><div class="v mid num">{{ kpi.active }}</div></div>
+      <div><div class="k">{{ t('an_rate') }}</div>
+        <div class="v mid num {{ 'text-ok' if kpi.rate >= 75 else ('text-warn' if kpi.rate >= 50 else 'text-bad') }}">{{ kpi.rate }}<span class="u">%</span></div></div>
+      <div><div class="k">{{ t('an_revenue') }}</div><div class="v mid num">{{ money(kpi.revenue) }}<span class="u">JD</span></div></div>
+    </div>
+  </section>
+
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('an_ai_insights') }}</h2></div>
+    <div class="rows">
+      {% for ins in insights %}
+      {% set tone = {'ok':'ok','warn':'warn','bad':'bad','muted':'mute'}[ins.tone] %}
+      <div class="row items-start">
+        <span class="tag tag-{{ tone }} mt-0.5">{{ icon('trend-up' if ins.tone == 'ok' else ('alert' if ins.tone in ['warn','bad'] else 'clock'),'w-3.5 h-3.5') }}</span>
+        <p class="flex-1 text-[14px] leading-relaxed">{{ ins.text }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if at_risk %}
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('an_at_risk') }}</h2><span class="meta num">{{ at_risk|length }}</span></div>
+    <div class="sheet-bd sub !pb-0">{{ t('an_at_risk_sub') }}</div>
+    <div class="rows mt-2">
+      {% for r in at_risk %}
+      <a href="/players/{{ r.id }}" class="row">
+        <span class="flex-1 font-bold truncate">{{ r.name }}</span>
+        <div class="bar w-24"><i style="width: {{ r.rate }}%; background:rgb(var(--bad))"></i></div>
+        <span class="num text-bad font-bold w-12 text-end">{{ r.rate }}%</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- money by month -->
+  {% set vals = fin_months|map(attribute='rev')|list + fin_months|map(attribute='earned')|list + fin_months|map(attribute='exp')|list + fin_months|map(attribute='profit')|list %}
+  {% set vmax = [vals|max if vals else 0, 1]|max %}{% set vmin = [vals|min if vals else 0, 0]|min %}
+  {% set span = vmax - vmin %}
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('an_chart_finance') }}</h2>
+      <a href="/finance" class="meta text-accent font-bold">{{ t('nav_finance') }}</a></div>
+    <div class="ledger" style="--cols:3">
+      <div><div class="k">{{ t('fin_revenue') }}</div><div class="v mid num !text-[18px]">{{ money(fin.revenue) }}</div></div>
+      <div><div class="k">{{ t('fin_expenses') }}</div><div class="v mid num !text-[18px]">{{ money(fin.expenses) }}</div></div>
+      <div><div class="k">{{ t('fin_profit') }}</div><div class="v mid num !text-[18px] {{ 'text-ok' if fin.profit >= 0 else 'text-bad' }}">{{ money(fin.profit) }}</div></div>
+    </div>
+    <div class="sheet-bd ledger-rule">
+      <div class="flex gap-4 flex-wrap sub mb-2">
+        <span class="flex items-center gap-1.5"><i class="swatch" style="background:rgb(var(--ink-2))"></i>{{ t('m_received') }}</span>
+        <span class="flex items-center gap-1.5"><i class="swatch" style="background:rgb(var(--acc))"></i>{{ t('m_earned') }}</span>
+        <span class="flex items-center gap-1.5"><i class="swatch" style="background:rgb(var(--bad) / .75)"></i>{{ t('fin_expenses') }}</span>
+        <span class="flex items-center gap-1.5"><i class="swatch" style="background:rgb(var(--ok))"></i>{{ t('fin_profit') }}</span>
+      </div>
+      <svg viewBox="0 0 320 140" class="w-full h-auto max-h-[190px] block mx-auto" role="img" aria-label="{{ t('an_chart_finance') }}" dir="ltr">
+        <line class="c-grid" x1="28" x2="318" y1="10" y2="10"/>
+        <text class="c-lbl" x="24" y="13" text-anchor="end">{{ money(vmax) }}</text>
+        <line class="c-zero" x1="28" x2="318" y1="{{ 10 + 110 * vmax / span }}" y2="{{ 10 + 110 * vmax / span }}"/>
+        <text class="c-lbl" x="24" y="{{ 13 + 110 * vmax / span }}" text-anchor="end">0</text>
+        {% set step = 290 / ([fin_months|length, 1]|max) %}
+        {% for f in fin_months %}
+        {% set x0 = 28 + step * loop.index0 + step * 0.12 %}{% set bw = step * 0.76 / 4 %}
+        {% for key, cls in [('rev','c-ink'), ('earned','c-acc'), ('exp','c-bad'), ('profit','c-ok')] %}
+        {% set v = f[key] or 0 %}{% set y1 = 10 + 110 * (vmax - v) / span %}{% set y0 = 10 + 110 * vmax / span %}
+        <rect class="{{ cls if not (key == 'profit' and v < 0) else 'c-bad' }}" x="{{ x0 + bw * loop.index0 }}" y="{{ [y1, y0]|min }}" width="{{ bw - 1 }}" height="{{ (y1 - y0)|abs }}"><title>{{ f.d }} · {{ key }} {{ money(v) }} JD</title></rect>
+        {% endfor %}
+        <text class="c-lbl" x="{{ 28 + step * loop.index0 + step / 2 }}" y="136" text-anchor="middle">{{ f.d }}</text>
+        {% endfor %}
+      </svg>
+    </div>
+  </section>
+
+  <div class="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('an_chart_rate') }}</h2></div>
+      <div class="sheet-bd">
+        {% set n = att_chart|length %}{% set step = 290 / ([n - 1, 1]|max) %}
+        <svg viewBox="0 0 320 132" class="w-full h-auto max-h-[190px] block mx-auto" role="img" dir="ltr">
+          {% for g in [0, 0.5, 1] %}
+          <line class="c-grid" x1="28" x2="318" y1="{{ 10 + 100 * (1 - g) }}" y2="{{ 10 + 100 * (1 - g) }}"/>
+          <text class="c-lbl" x="24" y="{{ 13 + 100 * (1 - g) }}" text-anchor="end">{{ (100 * g)|int }}%</text>
+          {% endfor %}
+          {% if n %}
+          <polyline class="c-line" points="{% for p in att_chart %}{{ 28 + step * loop.index0 }},{{ 110 - p.v }} {% endfor %}"/>
+          {% for p in att_chart %}
+          <circle class="c-pt" cx="{{ 28 + step * loop.index0 }}" cy="{{ 110 - p.v }}" r="2.6"><title>{{ p.d }} · {{ p.v }}%</title></circle>
+          {% if loop.first or loop.last or loop.index0 % 3 == 0 %}<text class="c-lbl" x="{{ 28 + step * loop.index0 }}" y="124" text-anchor="middle">{{ p.d }}</text>{% endif %}
+          {% endfor %}
+          {% else %}<text class="c-lbl" x="170" y="64" text-anchor="middle">-</text>{% endif %}
+        </svg>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('an_chart_rev') }}</h2></div>
+      <div class="sheet-bd">{{ bars(rev_chart, 'c-ink', unit=' JD') }}</div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('an_chart_groups') }}</h2></div>
+      <div class="sheet-bd grid gap-2.5">
+        {% for g in grp_chart %}
+        <div class="flex items-center gap-3 text-[13px]">
+          <span class="w-28 shrink-0 truncate">{{ g.d }}</span>
+          <div class="bar flex-1"><i style="width: {{ g.rate }}%; background:rgb(var(--acc))"></i></div>
+          <span class="num w-20 text-end shrink-0 {{ 'text-faint' if g.players == 0 }}">{{ g.rate }}% <span class="text-faint">· {{ g.players }}</span></span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('an_chart_new') }}</h2></div>
+      <div class="sheet-bd">{{ bars(new_chart, 'c-acc') }}</div>
+    </section>
+  </div>
+</div>
 {% endblock %}

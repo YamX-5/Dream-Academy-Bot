@@ -1,0 +1,39 @@
+{# Log one session's bookings + water with quantities. Needs: presets, today. #}
+{% from "_icons.html" import icon %}
+<form method="post" action="/expenses/session-log" class="sheet-bd" id="session-log" data-session-log>
+  <input type="hidden" name="back" value="{{ request.full_path.rstrip('?') }}">
+  <div class="grid gap-0 border border-edge rounded" role="group" aria-label="{{ t('d_today_costs') }}">
+    {% for p in presets %}
+    <div class="flex items-center gap-3 px-3 py-2 {{ 'border-t border-edge2' if not loop.first }}">
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-[14px] truncate">{{ p.name_ar if lang == 'ar' else p.name_en }}</div>
+        <div class="sub num">{{ p.price }} JD</div>
+      </div>
+      <div class="flex items-center gap-1" data-price="{{ p.price }}">
+        <button type="button" class="btn btn-line btn-sm btn-icon" data-step="-1" aria-label="-">{{ icon('minus','w-4 h-4') }}</button>
+        <input name="qty_{{ p.key }}" type="number" inputmode="numeric" min="0" step="1" value="0"
+               class="inp inp-sm num text-center !w-14" aria-label="{{ p.name_en }}">
+        <button type="button" class="btn btn-line btn-sm btn-icon" data-step="1" aria-label="+">{{ icon('plus','w-4 h-4') }}</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="flex items-center gap-2 mt-3 flex-wrap">
+    <input type="date" name="date" value="{{ today }}" class="inp inp-sm num !w-auto" aria-label="{{ t('date') }}">
+    <span class="ms-auto sub">{{ t('d_total') }} <b class="num text-ink text-[16px]" data-total>0</b> JD</span>
+    <button class="btn btn-ink btn-sm" data-submit disabled>{{ t('d_log_session') }}</button>
+  </div>
+</form>
+<script>
+document.querySelectorAll('[data-session-log]').forEach(f => {
+  const recalc = () => {
+    let t = 0;
+    f.querySelectorAll('[data-price]').forEach(r => { t += (parseFloat(r.querySelector('input').value)||0) * parseFloat(r.dataset.price); });
+    f.querySelector('[data-total]').textContent = (Math.round(t*100)/100).toString();
+    f.querySelector('[data-submit]').disabled = t <= 0;
+  };
+  f.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
+    const i = b.parentElement.querySelector('input'); i.value = Math.max(0, (parseInt(i.value)||0) + parseInt(b.dataset.step)); recalc(); }));
+  f.querySelectorAll('input[type=number]').forEach(i => i.addEventListener('input', recalc));
+});
+</script>

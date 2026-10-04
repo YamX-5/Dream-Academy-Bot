@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Dream Academy Manager — Flask app.
+"""Dream Academy Manager, Flask app.
 
 Runs locally on the laptop; coaches reach it from anywhere through a
 Cloudflare quick tunnel (started automatically if cloudflared.exe is present).
@@ -38,12 +38,12 @@ app.secret_key = "dream-academy-local-secret-key-2026"
 app.json.ensure_ascii = False
 
 # bump this string whenever the UI changes so you can confirm a fresh load
-BUILD = "v13 · 2026-08-20"
+BUILD = "v14 · 2026-10-04"
 
 
 @app.after_request
 def _no_cache(resp):
-    """Never let the browser serve a stale page — this is why UI changes
+    """Never let the browser serve a stale page, this is why UI changes
     sometimes 'don't show up' after a deploy."""
     ct = resp.headers.get("Content-Type", "")
     if ct.startswith("text/html"):
@@ -157,10 +157,27 @@ def inject_globals():
         "t": lambda key, **kw: translate(lang, key, **kw),
         "wa_num": jordan_wa_number,
         "BUILD": BUILD,
+        "logo_svg_uri": LOGO_SVG_URI,
     }
 
 
+LOGO_SVG_URI = urllib.parse.quote(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -40 350 232">'
+    '<path fill="#6EA3EE" d="M0 0H106C142 0 162 20 152 50L146 68H114L120 50C124 37 117 30 104 30H32V104H0Z"/>'
+    '<path fill="#4A4B50" d="M0 128C0 124 3 122 7 122H110C127 122 137 116 145 102L203 5C205 2 208 0 212 0H238'
+    'C242 0 245 2 247 5L330 152H296L225 26L177 110C160 140 140 152 108 152H7C3 152 0 150 0 146Z"/>'
+    '<path fill="#4A4B50" d="M201 97H287L301 122H187Z"/></svg>')
+
+
 # ---------------- helpers ----------------
+
+def _iso(v):
+    """A clean YYYY-MM-DD string or None (guards date fields from the browser)."""
+    try:
+        return date.fromisoformat((v or "").strip()[:10]).isoformat()
+    except (ValueError, AttributeError):
+        return None
+
 
 def _shift_month(d, delta):
     y = d.year + (d.month - 1 + delta) // 12
@@ -207,6 +224,16 @@ def render_template_msg(tpl, name, sessions_left=None, price=None):
     return msg
 
 
+def with_owed_wa(owed):
+    """Attach a polite WhatsApp reminder link to every row of money_owed()."""
+    for r in owed["rows"]:
+        if r.get("phone"):
+            msg = (f"مرحبا، ضايل على {r['name']} مبلغ {r['total']:g} دينار لأكاديمية Dream Academy. "
+                   "بنقدّر تسديده بأقرب وقت، ويعطيكم العافية.")
+            r["wa"] = wa_link(r["phone"], msg)
+    return owed
+
+
 def next_training_day(settings, from_date=None):
     """Today if it's a training day, else the next training day."""
     d = from_date or date.today()
@@ -218,19 +245,23 @@ def next_training_day(settings, from_date=None):
     return d
 
 
-def player_sub_info(con, player):
+def player_sub_info(con, player, settings=None):
     """Active-subscription summary dict for a player row."""
-    sub = db.get_active_subscription(con, player["id"])
+    settings = settings or db.get_settings()
+    sub = db.get_active_subscription(con, player["id"], settings)
     if not sub:
         # is there a recent non-active sub? (for "needs renewal" context)
         last = con.execute(
             "SELECT * FROM subscriptions WHERE player_id=? ORDER BY start_date DESC LIMIT 1", (player["id"],)
         ).fetchone()
         return {"active": False, "sub": dict(last) if last else None, "left": 0, "days_left": 0,
-                "needs_renewal": True}
-    prog = db.sub_progress(con, sub)
+                "upcoming": False, "next_session": None, "needs_renewal": True}
+    prog = db.sub_progress(con, sub, settings)
+    upcoming = date.fromisoformat(sub["start_date"]) > date.today()
     return {"active": True, "sub": dict(sub), "left": prog["left"], "used": prog["used"],
-            "days_left": prog["days_left"], "needs_renewal": prog["left"] <= 2 or prog["days_left"] <= 5}
+            "days_left": prog["days_left"], "upcoming": upcoming,
+            "next_session": next((d.isoformat() for d in prog["dates"] if d >= date.today()), None),
+            "needs_renewal": not upcoming and (prog["left"] <= 2 or prog["days_left"] <= 5)}
 
 
 # ---------------- pages ----------------
@@ -259,7 +290,7 @@ def dashboard():
             "SELECT COUNT(*) c FROM attendance WHERE session_date=? AND status='present'", (today,)).fetchone()["c"],
         "revenue_month": con.execute(
             "SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?", (month + "%",)).fetchone()["s"],
-        "unpaid_count": con.execute("SELECT COUNT(*) c FROM attendance WHERE unpaid=1").fetchone()["c"],
+        "unpaid_count": db.unpaid_sessions(con),
         "attendance_rate": db.month_attendance_rate(con, month),
     }
 
@@ -269,7 +300,7 @@ def dashboard():
         "SELECT p.*, g.name_ar AS group_name FROM players p LEFT JOIN groups g ON g.id=p.group_id "
         "WHERE p.status='active' ORDER BY p.full_name").fetchall()
     for p in players:
-        info = player_sub_info(con, p)
+        info = player_sub_info(con, p, st)
         if info["needs_renewal"]:
             left = info["left"] if info["active"] else 0
             msg = render_template_msg(st["template_renewal"], p["full_name"], left, st["monthly_price"])
@@ -277,19 +308,24 @@ def dashboard():
                 "player": dict(p), "left": left,
                 "days_left": info["days_left"] if info["active"] else 0,
                 "active": info["active"],
+                "used": info.get("used", 0) if info["active"] else 0,
+                "total": (info["sub"] or {}).get("sessions_total") or st["sessions_per_month"],
                 "wa": wa_link(p["guardian_phone"] or p["phone"], msg),
             })
+    # ranked like a departures board: lapsed first, then fewest days left
+    alerts.sort(key=lambda a: (a["active"], a["days_left"], a["left"]))
 
     # unpaid sessions list
     unpaid = con.execute(
         "SELECT a.session_date, p.id AS pid, p.full_name, p.guardian_phone, g.name_ar AS group_name "
         "FROM attendance a JOIN players p ON p.id=a.player_id LEFT JOIN groups g ON g.id=a.group_id "
-        "WHERE a.unpaid=1 ORDER BY a.session_date DESC").fetchall()
+        "WHERE a.unpaid=1 AND p.status!='left' ORDER BY a.session_date DESC").fetchall()
 
     # players a coach added, waiting for admin approval
     pending = con.execute(
         "SELECT p.id, p.full_name, p.guardian_phone, p.added_by, "
-        "COALESCE(g.name_ar, g.name_en) AS group_name FROM players p "
+        + ("COALESCE(NULLIF(g.name_en,''), g.name_ar)" if current_lang() == "en" else "COALESCE(NULLIF(g.name_ar,''), g.name_en)")
+        + " AS group_name FROM players p "
         "LEFT JOIN groups g ON g.id=p.group_id WHERE p.status='pending' ORDER BY p.id DESC").fetchall()
 
     # charts data
@@ -308,11 +344,23 @@ def dashboard():
     # birthdays this month
     mm = date.today().strftime("%m")
     bdays = [dict(p) for p in players if p["birth_date"] and p["birth_date"][5:7] == mm]
-    fin = db.finance(con, month)
+    fin = db.finance(con, month, st)
+    owed = with_owed_wa(db.money_owed(con, st))
+    balance = db.cash_balance(con, st)
+    projection = db.month_projection(con, st)
+    frozen_count = con.execute("SELECT COUNT(*) c FROM players WHERE status='frozen'").fetchone()["c"]
+    today_costs = db.session_costs_on(con, today)
+    salaries_owed = db.salaries_unpaid(con)
+    today_training = db.is_training_day(today, st)
     con.close()
     return render_template("dashboard.html", kpis=kpis, alerts=alerts, unpaid=unpaid,
                            pending=pending, att_chart=att_chart, rev_chart=rev_chart,
-                           grp_chart=grp_chart, bdays=bdays, fin=fin, public_url=PUBLIC_URL["url"])
+                           grp_chart=grp_chart, bdays=bdays, fin=fin, public_url=PUBLIC_URL["url"],
+                           owed=owed, balance=balance, projection=projection,
+                           frozen_count=frozen_count, today_training=today_training,
+                           today_costs=today_costs, salaries_owed=salaries_owed,
+                           presets=st.get("cost_presets") or [],
+                           today=today, month=month)
 
 
 # ---------------- players ----------------
@@ -344,15 +392,23 @@ def players_page():
     sql += " ORDER BY p.full_name"
     rows = con.execute(sql, args).fetchall()
 
+    st = db.get_settings()
+    owed = {r["id"]: r["total"] for r in db.money_owed(con, st)["rows"]}
     players = []
     for p in rows:
-        info = player_sub_info(con, p)
+        info = player_sub_info(con, p, st)
         if renewal and not info["needs_renewal"]:
             continue
-        players.append({"p": dict(p), "info": info})
+        players.append({"p": dict(p), "info": info, "owed": owed.get(p["id"], 0)})
     groups = con.execute("SELECT * FROM groups").fetchall()
+    # counts for the group tabs / status filter (unfiltered, so tabs stay stable)
+    group_counts = {r["group_id"]: r["c"] for r in con.execute(
+        "SELECT group_id, COUNT(*) c FROM players WHERE status IN ('active','frozen','pending') GROUP BY group_id")}
+    status_counts = {r["status"]: r["c"] for r in con.execute(
+        "SELECT status, COUNT(*) c FROM players GROUP BY status")}
     con.close()
     return render_template("players.html", players=players, groups=groups,
+                           group_counts=group_counts, status_counts=status_counts,
                            q=q, f_group=group_id, f_gender=gender, f_status=status, f_renewal=renewal)
 
 
@@ -390,7 +446,7 @@ def player_form(pid=None):
                 "group_id,join_date,notes,status,trial_used) VALUES (?,?,?,?,?,?,?,?,?,?,?)", vals)
             con.commit()
             new_id = cur.lastrowid
-            # a new player normally means they just paid — start their subscription
+            # a new player normally means they just paid, start their subscription
             if f.get("create_sub"):
                 db.create_subscription(
                     con, new_id,
@@ -398,8 +454,8 @@ def player_form(pid=None):
                     price=(f.get("sub_price") or None),
                     sessions_total=(f.get("sub_sessions") or None),
                     method=(f.get("sub_method") or "cash"),
-                    amount=(f.get("sub_price") or None))
-                con.commit()
+                    amount=(f.get("sub_paid") if f.get("sub_paid") not in (None, "") else (f.get("sub_price") or None)),
+                    pay_date=_iso(f.get("sub_pay_date")))
             con.close()
             return redirect(url_for("player_card", pid=new_id))
     groups = con.execute("SELECT * FROM groups").fetchall()
@@ -422,8 +478,9 @@ def api_suggest_group():
 @require_role("admin")
 def player_card(pid):
     con = db.get_db()
+    gcol = "COALESCE(NULLIF(g.name_en,''), g.name_ar)" if current_lang() == "en" else "COALESCE(NULLIF(g.name_ar,''), g.name_en)"
     p = con.execute(
-        "SELECT p.*, g.name_ar AS group_name FROM players p LEFT JOIN groups g ON g.id=p.group_id WHERE p.id=?",
+        f"SELECT p.*, {gcol} AS group_name FROM players p LEFT JOIN groups g ON g.id=p.group_id WHERE p.id=?",
         (pid,)).fetchone()
     if not p:
         con.close()
@@ -435,6 +492,9 @@ def player_card(pid):
     att = con.execute(
         "SELECT * FROM attendance WHERE player_id=? ORDER BY session_date DESC LIMIT 30", (pid,)).fetchall()
     att_stats = db.attendance_rate(con, pid)
+    balance = db.player_balance(con, pid)
+    freezes = con.execute("SELECT * FROM player_freezes WHERE player_id=? ORDER BY start_date DESC",
+                          (pid,)).fetchall()
     trial_row = con.execute(
         "SELECT session_date FROM attendance WHERE player_id=? AND trial=1 ORDER BY session_date LIMIT 1",
         (pid,)).fetchone()
@@ -442,12 +502,22 @@ def player_card(pid):
     msg = render_template_msg(st["template_renewal"], p["full_name"], info["left"], st["monthly_price"])
     wa = wa_link(p["guardian_phone"] or p["phone"], msg)
     # early-renewal option: day after previous expiry
+    # renewal start suggestion: the day after the current package ends (early
+    # renewal), else the day after the last package ended if it lapsed within
+    # ~5 weeks (forgot to renew), else today
     prev_expiry = None
-    if info["sub"] and info["sub"].get("expiry_date") and info["sub"]["expiry_date"] >= date.today().isoformat():
-        prev_expiry = (date.fromisoformat(info["sub"]["expiry_date"]) + timedelta(days=1)).isoformat()
+    suggested_start = date.today().isoformat()
+    if info["sub"] and info["sub"].get("expiry_date"):
+        nxt = (date.fromisoformat(info["sub"]["expiry_date"]) + timedelta(days=1)).isoformat()
+        if info["sub"]["expiry_date"] >= date.today().isoformat():
+            prev_expiry = nxt
+            suggested_start = nxt
+        elif (date.today() - date.fromisoformat(nxt)).days <= 35:
+            suggested_start = nxt
     con.close()
     return render_template("player_card.html", p=p, info=info, subs=subs, pays=pays, att=att,
                            att_stats=att_stats, wa=wa, settings=st, prev_expiry=prev_expiry,
+                           suggested_start=suggested_start, balance=balance, freezes=freezes,
                            trial_date=trial_date, today=date.today().isoformat())
 
 
@@ -456,22 +526,55 @@ def player_card(pid):
 def api_renew(pid):
     data = request.get_json(force=True)
     con = db.get_db()
-    start = data.get("start_date") or date.today().isoformat()
+    start = _iso(data.get("start_date")) or date.today().isoformat()
     sub_id, receipt = db.create_subscription(
         con, pid, start,
         price=data.get("price"), amount=data.get("amount"),
         sessions_total=data.get("sessions_total"),
-        method=data.get("method", "cash"), note=data.get("note", ""))
-    con.commit()
+        method=data.get("method", "cash"), note=data.get("note", ""),
+        pay_date=_iso(data.get("pay_date")))
+    sub = con.execute("SELECT expiry_date FROM subscriptions WHERE id=?", (sub_id,)).fetchone()
     con.close()
-    return jsonify({"ok": True, "subscription_id": sub_id, "receipt_no": receipt})
+    return jsonify({"ok": True, "subscription_id": sub_id, "receipt_no": receipt,
+                    "expiry": sub["expiry_date"] if sub else None})
+
+
+@app.route("/api/players/<int:pid>/pay", methods=["POST"])
+@require_role("admin")
+def api_pay(pid):
+    """Money received toward a player's outstanding balance."""
+    data = request.get_json(force=True)
+    try:
+        amount = float(data.get("amount") or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    if amount <= 0:
+        return jsonify({"error": "amount"}), 400
+    con = db.get_db()
+    receipt = db.add_payment(con, pid, amount, _iso(data.get("pay_date")),
+                             data.get("method", "cash"), (data.get("note") or "").strip())
+    bal = db.player_balance(con, pid)
+    con.close()
+    return jsonify({"ok": True, "receipt_no": receipt, "balance": bal})
+
+
+@app.route("/api/sub-preview")
+@require_role("admin")
+def api_sub_preview():
+    """Live preview for the renewal sheet: the dates a package would cover."""
+    start = _iso(request.args.get("start")) or date.today().isoformat()
+    n = max(1, min(200, request.args.get("sessions", type=int) or 12))
+    dates = db.session_dates(start, n, db.get_settings())
+    return jsonify({"start": start, "first": dates[0].isoformat() if dates else None,
+                    "end": dates[-1].isoformat() if dates else None, "count": len(dates)})
 
 
 @app.route("/api/players/<int:pid>/freeze", methods=["POST"])
 @require_role("admin")
 def api_freeze(pid):
+    data = request.get_json(silent=True) or {}
     con = db.get_db()
-    db.freeze_player(con, pid)
+    db.freeze_player(con, pid, _iso(data.get("date")))
     con.close()
     return jsonify({"ok": True})
 
@@ -479,8 +582,9 @@ def api_freeze(pid):
 @app.route("/api/players/<int:pid>/unfreeze", methods=["POST"])
 @require_role("admin")
 def api_unfreeze(pid):
+    data = request.get_json(silent=True) or {}
     con = db.get_db()
-    db.unfreeze_player(con, pid)
+    db.unfreeze_player(con, pid, _iso(data.get("date")))
     con.close()
     return jsonify({"ok": True})
 
@@ -596,9 +700,11 @@ def attendance_page():
     con.close()
     # always default to today (Jordan time); coach can step days with the arrows
     default_date = date.today().isoformat()
-    training_days = st.get("training_days") or []
+    schedule = [{"from": f.isoformat(), "days": [n for n in db.WEEKDAY_NAMES if db._WD[n] in w]}
+                for f, w in db.schedule_entries(st)]
+    closed = sorted(d.isoformat() for d in db.closed_dates(st))
     return render_template("attendance.html", groups=groups, default_date=default_date,
-                           today=default_date, training_days=training_days)
+                           today=default_date, schedule=schedule, closed=closed)
 
 
 @app.route("/api/attendance")
@@ -606,25 +712,33 @@ def attendance_page():
 def api_attendance_list():
     gid = request.args.get("group", type=int)
     sdate = request.args.get("date") or date.today().isoformat()
+    sdate = _iso(sdate) or date.today().isoformat()
     con = db.get_db()
+    st = db.get_settings()
     players = con.execute(
         "SELECT * FROM players WHERE group_id=? AND status IN ('active','frozen','pending') ORDER BY full_name",
         (gid,)).fetchall()
     marks = {r["player_id"]: r for r in con.execute(
         "SELECT * FROM attendance WHERE session_date=? AND group_id=?", (sdate, gid)).fetchall()}
-    out = []
+    out, frozen = [], []
     for p in players:
-        info = player_sub_info(con, p)
         m = marks.get(p["id"])
+        # frozen players are off the sheet: they can't be marked or billed
+        if p["status"] == "frozen" or db.frozen_on(con, p["id"], sdate):
+            frozen.append({"id": p["id"], "name": p["full_name"]})
+            continue
+        info = player_sub_info(con, p, st)
         out.append({
             "id": p["id"], "name": p["full_name"],
             "status": m["status"] if m else "none",
             "left": info["left"], "paid": info["active"],
-            "frozen": p["status"] == "frozen",
+            "total": (info["sub"] or {}).get("sessions_total") or 0 if info["active"] else 0,
+            "unpaid": bool(m and m["unpaid"]),
             "pending": p["status"] == "pending",
         })
     con.close()
-    return jsonify({"players": out, "date": sdate})
+    return jsonify({"players": out, "frozen": frozen, "date": sdate,
+                    "training": db.is_training_day(sdate, st)})
 
 
 @app.route("/api/attendance/add-player", methods=["POST"])
@@ -657,6 +771,10 @@ def api_attendance_add_player():
 def api_attendance_mark():
     data = request.get_json(force=True)
     con = db.get_db()
+    pl = con.execute("SELECT status FROM players WHERE id=?", (int(data["player_id"]),)).fetchone()
+    if not pl or pl["status"] == "frozen":
+        con.close()
+        return jsonify({"error": "frozen"}), 409
     result = db.mark_attendance(
         con, int(data["player_id"]), data["date"], int(data["group_id"]),
         data["status"], marked_by=current_role() or "")
@@ -676,9 +794,9 @@ def api_attendance_mark_all():
     gid = int(data["group_id"])
     sdate = data["date"]
     con = db.get_db()
-    players = con.execute(
-        "SELECT id FROM players WHERE group_id=? AND status IN ('active','frozen','pending')",
-        (gid,)).fetchall()
+    players = [p for p in con.execute(
+        "SELECT id FROM players WHERE group_id=? AND status IN ('active','pending')",
+        (gid,)).fetchall() if not db.frozen_on(con, p["id"], sdate)]
     existing = {r["player_id"]: r["status"] for r in con.execute(
         "SELECT player_id, status FROM attendance WHERE session_date=? AND group_id=?",
         (sdate, gid)).fetchall()}
@@ -705,9 +823,9 @@ def api_attendance_summary():
     excused = [r["full_name"] for r in rows if r["status"] == "excused"]
     d = date.fromisoformat(sdate)
     day_ar = DAY_AR.get(d.strftime("%A"), "")
-    lines = [f"Dream Academy — ملخص تمرين {g['name_ar']}",
+    lines = [f"Dream Academy, ملخص تمرين {g['name_ar']}",
              f"التاريخ: {day_ar} {d.strftime('%d/%m/%Y')}",
-             f"الحضور ({len(present)}): " + ("، ".join(present) if present else "—")]
+             f"الحضور ({len(present)}): " + ("، ".join(present) if present else "-")]
     if absent:
         lines.append(f"الغياب ({len(absent)}): " + "، ".join(absent))
     if excused:
@@ -795,7 +913,14 @@ def settings_page():
         st["sessions_per_month"] = int(f.get("sessions_per_month") or 12)
         st["expiry_days"] = int(f.get("expiry_days") or 35)
         st["deduct_on_absence"] = bool(f.get("deduct_on_absence"))
-        st["training_days"] = f.getlist("training_days") or st["training_days"]
+        new_days = f.getlist("training_days")
+        if new_days:
+            # schedule changes apply from a date, so past sessions never move
+            db.set_training_days(st, new_days, _iso(f.get("days_from")) or date.today().isoformat())
+        try:
+            st["opening_balance"] = float(f.get("opening_balance") or 0)
+        except ValueError:
+            pass
         st["academy_phone"] = (f.get("academy_phone") or "").strip()
         st["coach_pin"] = (f.get("coach_pin") or "1234").strip()
         st["admin_pin"] = (f.get("admin_pin") or "0000").strip()
@@ -817,6 +942,25 @@ def settings_page():
                 continue
         if bundles:
             st["bundles"] = bundles
+        # session cost presets (court / lights / water ...), priced per unit
+        p_key = f.getlist("preset_key"); p_en = f.getlist("preset_name_en"); p_ar = f.getlist("preset_name_ar")
+        p_pr = f.getlist("preset_price"); p_cat = f.getlist("preset_category")
+        presets = []
+        for i in range(len(p_en)):
+            name_en = (p_en[i] or "").strip()
+            name_ar = (p_ar[i] if i < len(p_ar) else "").strip()
+            if not name_en and not name_ar:
+                continue
+            try:
+                price = float(p_pr[i] or 0)
+            except (ValueError, IndexError):
+                continue
+            key = (p_key[i] if i < len(p_key) else "") or re.sub(r"\W+", "_", (name_en or name_ar).lower()).strip("_") or f"p{i}"
+            cat = (p_cat[i] if i < len(p_cat) else "") or "other"
+            presets.append({"key": key, "name_en": name_en or name_ar, "name_ar": name_ar or name_en,
+                            "price": price, "category": cat if cat in EXPENSE_CATEGORIES else "other"})
+        if p_en:
+            st["cost_presets"] = presets
         db.save_settings(st)
         saved = True
     con = db.get_db()
@@ -826,9 +970,34 @@ def settings_page():
     con.close()
     group_error = request.args.get("group_error", type=int)
     shown_url = coach_access_url()
+    history = sorted(st.get("schedule_history") or [], key=lambda h: h["from"], reverse=True)
+    closed = sorted(st.get("closed_days") or [], key=lambda c: c["date"], reverse=True)
     return render_template("settings.html", st=st, saved=saved, groups=groups,
                            all_days=list(DAY_AR.keys()), public_url=shown_url,
-                           group_error=group_error)
+                           group_error=group_error, history=history, closed=closed,
+                           today=date.today().isoformat(), categories=EXPENSE_CATEGORIES)
+
+
+@app.route("/settings/closed-days", methods=["POST"])
+@require_role("admin")
+def closed_days_save():
+    """Add or remove an academy day off (no session: subscriptions extend)."""
+    st = db.get_settings()
+    days = [c for c in (st.get("closed_days") or []) if isinstance(c, dict)]
+    d = _iso(request.form.get("date"))
+    if request.form.get("remove") and d:
+        days = [c for c in days if c.get("date") != d]
+    elif d:
+        days = [c for c in days if c.get("date") != d]
+        days.append({"date": d, "note": (request.form.get("note") or "").strip()[:60]})
+    st["closed_days"] = days
+    db.save_settings(st)
+    # sessions moved: unpaid flags may change for everyone who trained that day
+    con = db.get_db()
+    for p in con.execute("SELECT DISTINCT player_id FROM attendance WHERE session_date=?", (d,)).fetchall():
+        db.refresh_unpaid(con, p["player_id"], st)
+    con.close()
+    return redirect(url_for("settings_page") + "#schedule")
 
 
 @app.route("/groups/save", methods=["POST"])
@@ -982,17 +1151,19 @@ def analytics_page():
             insights.append({"tone": "warn", "text": ai_insight_rev(current_lang(), "down", rev, prev_rev)})
     if not insights:
         insights.append({"tone": "muted", "text": (
-            "لسا ما في بيانات كافية لتحليل — سجّل حضور ودفعات أكثر." if current_lang() == "ar"
-            else "Not enough data yet — log more attendance and payments.")})
+            "لسا ما في بيانات كافية لتحليل, سجّل حضور ودفعات أكثر." if current_lang() == "ar"
+            else "Not enough data yet, log more attendance and payments.")})
 
-    fin = db.finance(con, month)
+    vals = db._session_values(con, st)
+    fin = db.finance(con, month, st, vals)
     # revenue vs expenses vs profit across recent months (for a column chart)
     fin_months = []
     d0 = today.replace(day=1)
     for i in range(5, -1, -1):
-        mm = (d0 - timedelta(days=30 * i)).strftime("%Y-%m")
-        f = db.finance(con, mm)
-        fin_months.append({"d": mm[2:], "rev": f["revenue"], "exp": f["expenses"], "profit": f["profit"]})
+        mm = _shift_month(d0, -i).strftime("%Y-%m")
+        f = db.finance(con, mm, st, vals)
+        fin_months.append({"d": mm[2:], "rev": f["revenue"], "earned": f["earned"],
+                           "exp": f["expenses"], "profit": f["profit"]})
     con.close()
     return render_template("analytics.html",
                            kpi={"total": total_players, "active": active, "rate": rate or 0, "revenue": rev},
@@ -1002,12 +1173,12 @@ def analytics_page():
 
 
 def ai_insight_att_up(lang, diff, rate):
-    return (f"الحضور ارتفع {diff} نقطة عن الشهر الماضي ووصل {rate}٪ — استمر بنفس الروتين." if lang == "ar"
+    return (f"الحضور ارتفع {diff} نقطة عن الشهر الماضي ووصل {rate}٪, استمر بنفس الروتين." if lang == "ar"
             else f"Attendance is up {diff} points vs last month, now {rate}%. Keep the routine going.")
 
 
 def ai_insight_att_down(lang, diff, rate):
-    return (f"الحضور نزل {diff} نقطة لـ {rate}٪ — فكّر تبعث تذكير للأهالي." if lang == "ar"
+    return (f"الحضور نزل {diff} نقطة لـ {rate}٪, فكّر تبعث تذكير للأهالي." if lang == "ar"
             else f"Attendance dropped {diff} points to {rate}%. Consider a reminder to parents.")
 
 
@@ -1017,8 +1188,8 @@ def ai_insight_best_group(lang, g):
 
 
 def ai_insight_at_risk(lang, n):
-    return (f"{n} لاعب حضورهم أقل من 50٪ — معرّضين يتركوا، تابعهم." if lang == "ar"
-            else f"{n} players are below 50% attendance — at risk of dropping out. Follow up.")
+    return (f"{n} لاعب حضورهم أقل من 50٪, معرّضين يتركوا، تابعهم." if lang == "ar"
+            else f"{n} players are below 50% attendance, at risk of dropping out. Follow up.")
 
 
 def ai_insight_rev(lang, dirn, rev, prev):
@@ -1032,7 +1203,7 @@ def ai_insight_rev(lang, dirn, rev, prev):
 # ---------------- finance: coaches, salaries, expenses, profit ----------------
 
 # preset expense categories (label comes from i18n as exp_cat_<key>)
-EXPENSE_CATEGORIES = ["court_rent", "equipment", "transport", "utilities",
+EXPENSE_CATEGORIES = ["court_rent", "water", "equipment", "transport", "utilities",
                       "maintenance", "referees", "marketing", "other"]
 
 @app.route("/finance")
@@ -1040,8 +1211,20 @@ EXPENSE_CATEGORIES = ["court_rent", "equipment", "transport", "utilities",
 def finance_page():
     month = request.args.get("month") or date.today().strftime("%Y-%m")
     con = db.get_db()
-    fin = db.finance(con, month)
+    st = db.get_settings()
+    fin = db.finance(con, month, st)
     today = date.today().isoformat()
+    is_current = month == date.today().strftime("%Y-%m")
+    projection = db.month_projection(con, st) if is_current else None
+    owed = with_owed_wa(db.money_owed(con, st))
+    balance = db.cash_balance(con, st)
+    weekly = db.weekly_cash(con, 8, st)
+    fixed_monthly = db.month_salaries(con, month) + db.month_expense_total(con, month, st, projected=True)
+    runway = round(balance / fixed_monthly, 1) if fixed_monthly > 0 and balance > 0 else None
+    sessions_held = db.month_sessions(month, st)
+    salaries_owed = db.salaries_unpaid(con)
+    presets = st.get("cost_presets") or []
+    today_costs = db.session_costs_on(con, today)
     coaches = []
     for c in con.execute("SELECT * FROM coaches ORDER BY active DESC, name").fetchall():
         present_today = con.execute(
@@ -1049,13 +1232,16 @@ def finance_page():
         coaches.append({**dict(c),
                         "sessions": db.coach_month_sessions(con, c["id"], month),
                         "cost": db.coach_month_cost(con, c, month),
+                        "salary": db.salary_status(con, c, month),
+                        "payouts": con.execute("SELECT * FROM salary_payouts WHERE coach_id=? AND month=? "
+                                               "ORDER BY date", (c["id"], month)).fetchall(),
                         "present_today": bool(present_today)})
-    expenses = db.month_expense_rows(con, month)
-    expenses = sorted(expenses, key=lambda r: (r["recurring"] if "recurring" in r.keys() else 0, r["date"]), reverse=True)
-    breakdown = db.expenses_by_category(con, month)
+    expenses = db.month_expense_rows(con, month, st)
+    expenses = sorted(expenses, key=lambda r: (r["kind"], r["date"]), reverse=True)
+    breakdown = db.expenses_by_category(con, month, st)
     # last month's expenses, so recurring ones (court rent…) can be copied in one tap
     prev_month = _shift_month(date.fromisoformat(month + "-01"), -1).strftime("%Y-%m")
-    prev_count = con.execute("SELECT COUNT(*) c FROM expenses WHERE date LIKE ?",
+    prev_count = con.execute("SELECT COUNT(*) c FROM expenses WHERE date LIKE ? AND COALESCE(recurring,0)=0",
                              (prev_month + "%",)).fetchone()["c"]
     months = month_options(con)
     if month not in months:
@@ -1064,7 +1250,10 @@ def finance_page():
     return render_template("finance.html", fin=fin, coaches=coaches, expenses=expenses,
                            breakdown=breakdown, categories=EXPENSE_CATEGORIES,
                            prev_month=prev_month, prev_count=prev_count,
-                           month=month, months=months, today=today)
+                           month=month, months=months, today=today, projection=projection,
+                           owed=owed, balance=balance, weekly=weekly, runway=runway,
+                           sessions_held=sessions_held, is_current=is_current,
+                           salaries_owed=salaries_owed, presets=presets, today_costs=today_costs)
 
 
 @app.route("/coaches/save", methods=["POST"])
@@ -1091,7 +1280,8 @@ def coaches_save():
 @require_role("admin")
 def coaches_delete(cid):
     con = db.get_db()
-    has_att = con.execute("SELECT 1 FROM coach_attendance WHERE coach_id=? LIMIT 1", (cid,)).fetchone()
+    has_att = con.execute("SELECT 1 FROM coach_attendance WHERE coach_id=? LIMIT 1", (cid,)).fetchone() or \
+        con.execute("SELECT 1 FROM salary_payouts WHERE coach_id=? LIMIT 1", (cid,)).fetchone()
     if has_att:
         con.execute("UPDATE coaches SET active=0 WHERE id=?", (cid,))  # keep history
     else:
@@ -1101,12 +1291,75 @@ def coaches_delete(cid):
     return redirect(url_for("finance_page"))
 
 
-@app.route("/coaches/<int:cid>/present", methods=["POST"])
-@require_role("admin")
-def coach_present(cid):
-    """Toggle a coach's attendance for today."""
+@app.route("/api/coaches")
+@require_role("admin", "coach")
+def api_coaches_day():
+    """Active coaches and whether each worked on a date (attendance sheet strip)."""
+    on = _iso(request.args.get("date")) or date.today().isoformat()
     con = db.get_db()
-    today = date.today().isoformat()
+    rows = [{"id": c["id"], "name": c["name"], "present": bool(con.execute(
+        "SELECT 1 FROM coach_attendance WHERE coach_id=? AND session_date=?", (c["id"], on)).fetchone())}
+        for c in con.execute("SELECT * FROM coaches WHERE active=1 ORDER BY name").fetchall()]
+    con.close()
+    return jsonify({"date": on, "coaches": rows})
+
+
+@app.route("/coaches/<int:cid>/pay", methods=["POST"])
+@require_role("admin")
+def coach_pay(cid):
+    """Record a salary handed to a coach for a month (amount defaults to what's left)."""
+    f = request.form
+    month = (f.get("month") or date.today().strftime("%Y-%m"))[:7]
+    con = db.get_db()
+    c = con.execute("SELECT * FROM coaches WHERE id=?", (cid,)).fetchone()
+    if c:
+        try:
+            amount = float(f.get("amount") or 0)
+        except ValueError:
+            amount = 0
+        if amount <= 0:
+            amount = db.salary_status(con, c, month)["left"]
+        if amount > 0:
+            con.execute("INSERT INTO salary_payouts (coach_id, month, amount, date, method) VALUES (?,?,?,?,?)",
+                        (cid, month, amount, _iso(f.get("date")) or date.today().isoformat(),
+                         f.get("method") or "cash"))
+            con.commit()
+    con.close()
+    return redirect(url_for("finance_page", month=month) + "#coaches")
+
+
+@app.route("/salary/<int:sid>/delete", methods=["POST"])
+@require_role("admin")
+def salary_delete(sid):
+    con = db.get_db()
+    row = con.execute("SELECT month FROM salary_payouts WHERE id=?", (sid,)).fetchone()
+    con.execute("DELETE FROM salary_payouts WHERE id=?", (sid,))
+    con.commit()
+    con.close()
+    return redirect(url_for("finance_page", month=row["month"] if row else None) + "#coaches")
+
+
+@app.route("/expenses/session-log", methods=["POST"])
+@require_role("admin")
+def expenses_session_log():
+    """Log one session's bookings and water with quantities."""
+    f = request.form
+    on = _iso(f.get("date")) or date.today().isoformat()
+    st = db.get_settings()
+    qty = {p["key"]: f.get("qty_" + p["key"]) for p in st.get("cost_presets") or []}
+    con = db.get_db()
+    db.log_session_costs(con, on, qty, st)
+    con.close()
+    return redirect(f.get("back") or url_for("finance_page", month=on[:7]))
+
+
+@app.route("/coaches/<int:cid>/present", methods=["POST"])
+@require_role("admin", "coach")
+def coach_present(cid):
+    """Toggle a coach's attendance for a date (default today)."""
+    con = db.get_db()
+    data = request.get_json(silent=True) or {}
+    today = _iso(data.get("date") or request.form.get("date")) or date.today().isoformat()
     row = con.execute("SELECT id FROM coach_attendance WHERE coach_id=? AND session_date=?",
                       (cid, today)).fetchone()
     if row:
@@ -1126,9 +1379,8 @@ def expenses_save():
     f = request.form
     con = db.get_db()
     con.execute("INSERT INTO expenses (date, category, amount, note, recurring) VALUES (?,?,?,?,?)",
-                (f.get("date") or date.today().isoformat(), (f.get("category") or "other").strip(),
-                 float(f.get("amount") or 0), (f.get("note") or "").strip(),
-                 1 if f.get("recurring") else 0))
+                (_iso(f.get("date")) or date.today().isoformat(), (f.get("category") or "other").strip(),
+                 float(f.get("amount") or 0), (f.get("note") or "").strip(), _exp_kind(f)))
     con.commit()
     con.close()
     return redirect(url_for("finance_page", month=(f.get("date") or "")[:7] or None))
@@ -1143,15 +1395,43 @@ def expenses_edit(eid):
     e = con.execute("SELECT * FROM expenses WHERE id=?", (eid,)).fetchone()
     if e:
         con.execute("UPDATE expenses SET date=?, category=?, amount=?, note=?, recurring=? WHERE id=?",
-                    ((f.get("date") or e["date"]).strip(),
+                    (_iso(f.get("date")) or e["date"],
                      (f.get("category") or e["category"] or "other").strip(),
                      float(f.get("amount") or e["amount"]),
                      (f.get("note") if f.get("note") is not None else e["note"]).strip(),
-                     1 if f.get("recurring") else 0, eid))
+                     _exp_kind(f), eid))
         con.commit()
     month = (f.get("date") or (e["date"] if e else ""))[:7]
     con.close()
     return redirect(url_for("finance_page", month=month or None))
+
+
+def _exp_kind(f):
+    """once / monthly / session -> expenses.recurring (0/1/2)."""
+    return {"monthly": db.EXP_MONTHLY, "session": db.EXP_PER_SESSION}.get(
+        f.get("kind") or ("monthly" if f.get("recurring") else ""), db.EXP_ONCE)
+
+
+@app.route("/expenses/<int:eid>/stop", methods=["POST"])
+@require_role("admin")
+def expenses_stop(eid):
+    """End a monthly / per-session expense from today (history stays intact)."""
+    con = db.get_db()
+    con.execute("UPDATE expenses SET end_date=? WHERE id=?",
+                (_iso(request.form.get("date")) or date.today().isoformat(), eid))
+    con.commit()
+    con.close()
+    return redirect(request.referrer or url_for("finance_page"))
+
+
+@app.route("/expenses/<int:eid>/resume", methods=["POST"])
+@require_role("admin")
+def expenses_resume(eid):
+    con = db.get_db()
+    con.execute("UPDATE expenses SET end_date=NULL WHERE id=?", (eid,))
+    con.commit()
+    con.close()
+    return redirect(request.referrer or url_for("finance_page"))
 
 
 @app.route("/expenses/<int:eid>/delete", methods=["POST"])
@@ -1173,7 +1453,8 @@ def expenses_copy():
     if not src or not dst:
         return redirect(url_for("finance_page"))
     con = db.get_db()
-    rows = con.execute("SELECT * FROM expenses WHERE date LIKE ?", (src + "%",)).fetchall()
+    rows = con.execute("SELECT * FROM expenses WHERE date LIKE ? AND COALESCE(recurring,0)=0",
+                       (src + "%",)).fetchall()
     for r in rows:
         day = (r["date"] or "")[8:10] or "01"
         # clamp the day so e.g. the 31st doesn't fall outside a shorter month
@@ -1185,6 +1466,61 @@ def expenses_copy():
     con.commit()
     con.close()
     return redirect(url_for("finance_page", month=dst))
+
+
+# ---------------- events (schools, outdoor, collabs, sponsorships) ----------------
+
+EVENT_KINDS = ["school", "outdoor", "indoor", "tournament", "collab", "sponsorship", "other"]
+
+
+@app.route("/events")
+@require_role("admin", "coach")
+def events_page():
+    """Every coach sees the schedule; only the admin adds or edits."""
+    con = db.get_db()
+    today = date.today().isoformat()
+    upcoming = con.execute("SELECT * FROM events WHERE date>=? ORDER BY date, start_time", (today,)).fetchall()
+    past = con.execute("SELECT * FROM events WHERE date<? ORDER BY date DESC, start_time DESC LIMIT 20",
+                       (today,)).fetchall()
+    con.close()
+    return render_template("events.html", upcoming=upcoming, past=past, kinds=EVENT_KINDS, today=today)
+
+
+@app.route("/events/save", methods=["POST"])
+@require_role("admin")
+def events_save():
+    f = request.form
+    title = (f.get("title") or "").strip()
+    on = _iso(f.get("date"))
+    if title and on:
+        try:
+            amount = float(f.get("amount")) if (f.get("amount") or "").strip() else None
+        except ValueError:
+            amount = None
+        kind = f.get("kind") if f.get("kind") in EVENT_KINDS else "other"
+        vals = (title, kind, (f.get("partner") or "").strip(), (f.get("location") or "").strip(), on,
+                (f.get("start_time") or "").strip()[:5], (f.get("end_time") or "").strip()[:5], amount,
+                (f.get("notes") or "").strip())
+        con = db.get_db()
+        if f.get("id"):
+            con.execute("UPDATE events SET title=?, kind=?, partner=?, location=?, date=?, start_time=?, "
+                        "end_time=?, amount=?, notes=? WHERE id=?", vals + (f.get("id"),))
+        else:
+            con.execute("INSERT INTO events (title, kind, partner, location, date, start_time, end_time, amount, notes) "
+                        "VALUES (?,?,?,?,?,?,?,?,?)", vals)
+        con.commit()
+        con.close()
+    return redirect(url_for("events_page"))
+
+
+@app.route("/events/<int:eid>/delete", methods=["POST"])
+@require_role("admin")
+def events_delete(eid):
+    con = db.get_db()
+    con.execute("DELETE FROM events WHERE id=?", (eid,))
+    con.commit()
+    con.close()
+    return redirect(url_for("events_page"))
 
 
 # ---------------- excel ----------------
@@ -1229,11 +1565,13 @@ def import_players():
 @require_role("admin")
 def qr_page():
     url = coach_access_url()
-    import qrcode
     import base64
-    img = qrcode.make(url)
+    import qrcode
+    import qrcode.image.svg
+    # SVG needs no Pillow and stays sharp when printed for the gym wall
+    img = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2)
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    img.save(buf)
     b64 = base64.b64encode(buf.getvalue()).decode()
     return render_template("qr.html", url=url, qr_b64=b64, tunnel=(url != f"http://{get_local_ip()}:8000"))
 
@@ -1287,7 +1625,7 @@ def start_tunnel():
     threading.Thread(target=run, daemon=True).start()
 
 
-# idempotent — also covers WSGI hosting where __main__ never runs
+# idempotent, also covers WSGI hosting where __main__ never runs
 db.init_db()
 
 if __name__ == "__main__":

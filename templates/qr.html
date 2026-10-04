@@ -1,28 +1,29 @@
 {% extends "base.html" %}
-{% block title %}QR — Dream Academy{% endblock %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ t('coach_access') }}{% endblock %}
 {% block content %}
-<div class="text-center py-6">
-  <h1 class="text-xl font-bold text-ink mb-2">{{ t('coach_access') }}</h1>
-  {% if tunnel %}
-  <p class="text-dim mb-6 text-sm">{{ t('tunnel_note')|safe }}</p>
-  {% else %}
-  <p class="text-warn mb-6 text-sm">{{ t('no_tunnel_note') }}</p>
-  {% endif %}
-  <div class="inline-block bg-white p-4 rounded-xl mb-4">
-    <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR code for coach access" class="w-64 h-64" width="256" height="256" />
+<div class="stack max-w-[560px] mx-auto">
+  <div>
+    <h1 class="h-page">{{ t('coach_access') }}</h1>
+    {% if tunnel %}<p class="sub mt-1">{{ t('tunnel_note')|safe }}</p>
+    {% else %}<p class="text-warn text-[13px] font-semibold mt-1">{{ t('no_tunnel_note') }}</p>{% endif %}
   </div>
-  <div class="text-accent font-mono text-sm break-all mb-6" dir="ltr">{{ url }}</div>
-  <div class="bg-card rounded-lg p-4 border border-edge text-sm text-ink max-w-md mx-auto"
-       style="text-align:{{ 'right' if lang == 'ar' else 'left' }}">
-    <div class="label-xs mb-2">{{ t('for_coach') }}</div>
-    <ol class="list-decimal {{ 'pr-5' if lang == 'ar' else 'pl-5' }} space-y-1.5">
-      <li>{{ t('qr_step1') }}</li>
-      <li>{{ t('qr_step2') }}</li>
-      <li>{{ t('qr_step3') }}</li>
+
+  <section class="sheet">
+    <div class="sheet-bd flex flex-col items-center !py-6">
+      <div class="bg-white p-3 rounded border border-edge">
+        <img src="data:image/svg+xml;base64,{{ qr_b64 }}" alt="{{ t('coach_access') }} QR" class="w-60 h-60" width="240" height="240">
+      </div>
+      <div class="num text-accent text-[13px] font-semibold break-all text-center mt-4" dir="ltr" id="qrUrl">{{ url }}</div>
+      <button type="button" class="btn btn-line btn-sm mt-3" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('qrUrl').textContent.trim()).then(()=>toast({{ t('c_link_copied')|tojson }}))">{{ icon('file','w-4 h-4') }}{{ t('c_copy_link') }}</button>
+    </div>
+    <div class="sheet-hd ledger-rule !border-b-0"><h2 class="h-sec">{{ t('for_coach') }}</h2></div>
+    <ol class="rows border-t border-edge">
+      {% for k in ['qr_step1','qr_step2','qr_step3'] %}
+      <li class="row" style="min-height:46px"><span class="num font-extrabold text-accent w-5">{{ loop.index }}</span><span class="flex-1 text-[14px]">{{ t(k) }}</span></li>
+      {% endfor %}
     </ol>
-  </div>
-  {% if tunnel %}
-  <p class="text-xs text-dim mt-4 max-w-md mx-auto">{{ t('link_changes') }}</p>
-  {% endif %}
+  </section>
+  {% if tunnel %}<p class="sub">{{ t('link_changes') }}</p>{% endif %}
 </div>
 {% endblock %}

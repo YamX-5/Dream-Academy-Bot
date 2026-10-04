@@ -1,189 +1,374 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
-{% set pal = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
+{% from "_ui.html" import money, initials, tally, dmon %}
 
 {% macro coach_form(c) %}
-<form method="post" action="/coaches/save" class="space-y-2">
+<form method="post" action="/coaches/save" class="grid gap-3">
   {% if c %}<input type="hidden" name="id" value="{{ c.id }}">{% endif %}
-  <div><label class="label-xs">{{ t('coach_name') }}</label>
-    <input name="name" required value="{{ c.name if c else '' }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 text-sm mt-0.5 focus:border-accent outline-none"></div>
-  <div><label class="label-xs">{{ t('coach_phone') }}</label>
-    <input name="phone" value="{{ c.phone if c else '' }}" inputmode="tel" placeholder="07XXXXXXXX" class="w-full bg-bg border border-edge rounded-md px-2 py-2 text-sm num mt-0.5 focus:border-accent outline-none"></div>
-  <div class="grid grid-cols-2 gap-2">
-    <div><label class="label-xs">{{ t('salary_type') }}</label>
-      <select name="salary_type" class="w-full bg-bg border border-edge rounded-md px-2 py-2 text-sm mt-0.5 focus:border-accent outline-none">
+  <label class="field"><span class="label">{{ t('coach_name') }}</span>
+    <input name="name" required value="{{ c.name if c else '' }}" class="inp"></label>
+  <label class="field"><span class="label">{{ t('coach_phone') }}</span>
+    <input name="phone" value="{{ c.phone if c else '' }}" inputmode="tel" placeholder="07XXXXXXXX" class="inp num"></label>
+  <div class="grid grid-cols-2 gap-3">
+    <label class="field"><span class="label">{{ t('salary_type') }}</span>
+      <select name="salary_type" class="inp">
         <option value="monthly" {% if c and c.salary_type=='monthly' %}selected{% endif %}>{{ t('salary_monthly') }}</option>
         <option value="session" {% if c and c.salary_type=='session' %}selected{% endif %}>{{ t('salary_session') }}</option>
-      </select></div>
-    <div><label class="label-xs">{{ t('salary_amount') }}</label>
-      <input name="salary_amount" type="number" step="0.5" value="{{ c.salary_amount if c else '' }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 text-sm num mt-0.5 focus:border-accent outline-none"></div>
+      </select></label>
+    <label class="field"><span class="label">{{ t('salary_amount') }}</span>
+      <input name="salary_amount" type="number" step="0.5" min="0" value="{{ c.salary_amount if c else '' }}" class="inp num"></label>
   </div>
-  <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="active" {% if not c or c.active %}checked{% endif %}> {{ t('coach_active') }}</label>
-  <button class="w-full bg-accent text-bg font-semibold rounded-md py-2 text-sm">{{ t('save') }}</button>
+  <label class="check"><input type="checkbox" name="active" {% if not c or c.active %}checked{% endif %}> {{ t('coach_active') }}</label>
+  <button class="btn btn-ink btn-block">{{ t('save') }}</button>
 </form>
 {% if c %}
-<form method="post" action="/coaches/{{ c.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_coach')|tojson }})" class="text-center pt-2">
-  <button class="text-bad text-xs">{{ t('delete') }}</button>
+<form method="post" action="/coaches/{{ c.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_coach')|tojson }})" class="mt-3 text-center">
+  <button class="btn btn-danger btn-sm">{{ t('delete') }}</button>
 </form>
 {% endif %}
 {% endmacro %}
 
+{% macro kind_seg(sel, uid) %}
+<div class="seg" role="radiogroup" aria-label="{{ t('m_kind') }}">
+  <label><input type="radio" name="kind" value="once" {% if sel != 1 %}checked{% endif %} id="k1{{ uid }}"><span>{{ t('m_kind_once') }}</span></label>
+  <label><input type="radio" name="kind" value="monthly" {% if sel == 1 %}checked{% endif %} id="k2{{ uid }}"><span>{{ t('m_kind_monthly') }}</span></label>
+</div>
+{% endmacro %}
+
 {% block title %}{{ t('finance_title') }}{% endblock %}
+{% block head %}
+<style>
+  .m-led4 > div:nth-child(n+3) { border-top:1px solid rgb(var(--rule)); }
+  .m-led4 > div:nth-child(3) { border-inline-start:0; }
+  @media (min-width:1024px){
+    .m-led4 { --cols:4 !important; }
+    .m-led4 > div:nth-child(n+3) { border-top:0; }
+    .m-led4 > div:nth-child(3) { border-inline-start:1px solid rgb(var(--rule)); }
+  }
+  .wk-cash { fill:rgb(var(--ink-2)); } .wk-earn { fill:rgb(var(--acc)); }
+  .wk-grid { stroke:rgb(var(--rule)); stroke-width:1; } .wk-lbl { fill:rgb(var(--muted)); font-size:11px; font-family:Montserrat,sans-serif; }
+  .swatch { width:10px; height:10px; border-radius:1px; display:inline-block; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="flex items-center justify-between gap-2 mb-3">
-  <h1 class="text-xl font-bold text-ink flex items-center gap-2">
-    <span class="text-accent">{{ icon('wallet','w-5 h-5') }}</span>{{ t('finance_title') }}
-  </h1>
-  <form method="get">
-    <select name="month" onchange="this.form.submit()" class="bg-card border border-edge rounded-md px-2 py-1.5 text-sm num focus:border-accent outline-none">
-      {% for m in months %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ m }}</option>{% endfor %}
-    </select>
-  </form>
-</div>
+<div class="stack">
 
-<!-- finance summary -->
-<div class="grid grid-cols-2 gap-2 mb-5">
-  <div class="kpi kpi-ok bg-card rounded-lg p-3 border border-edge">
-    <div class="label-xs mb-0.5">{{ t('fin_revenue') }}</div>
-    <div class="text-xl font-extrabold num text-ok">{{ fin.revenue }}<span class="text-xs"> JD</span></div>
+  <div class="flex items-end gap-3 flex-wrap">
+    <h1 class="h-page">{{ t('finance_title') }}</h1>
+    <form method="get" class="ms-auto">
+      <select name="month" onchange="this.form.submit()" class="inp inp-sm num !w-auto" aria-label="{{ t('m_month') }}">
+        {% for m in months %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ m }}</option>{% endfor %}
+      </select>
+    </form>
   </div>
-  <div class="kpi kpi-bad bg-card rounded-lg p-3 border border-edge">
-    <div class="label-xs mb-0.5">{{ t('fin_expenses') }}</div>
-    <div class="text-xl font-extrabold num text-bad">{{ fin.expenses }}<span class="text-xs"> JD</span></div>
-    <div class="text-[10px] text-faint num mt-0.5">{{ t('fin_salaries') }} {{ fin.salaries }} · {{ t('fin_other') }} {{ fin.other }}</div>
-  </div>
-  <div class="kpi {{ 'kpi-ok' if fin.profit >= 0 else 'kpi-bad' }} bg-card rounded-lg p-3 border border-edge">
-    <div class="label-xs mb-0.5">{{ t('fin_profit') }}</div>
-    <div class="text-xl font-extrabold num {{ 'text-ok' if fin.profit >= 0 else 'text-bad' }}">{{ fin.profit }}<span class="text-xs"> JD</span></div>
-  </div>
-  <div class="kpi bg-card rounded-lg p-3 border border-edge">
-    <div class="label-xs mb-0.5">{{ t('fin_margin') }}</div>
-    <div class="text-xl font-extrabold num {{ 'text-ok' if (fin.margin or 0) >= 0 else 'text-bad' }}">{{ fin.margin if fin.margin is not none else '—' }}{% if fin.margin is not none %}%{% endif %}</div>
-  </div>
-</div>
 
-<!-- coaches -->
-<h2 class="font-bold text-ink flex items-center gap-2 mb-2"><span class="text-accent">{{ icon('whistle','w-4 h-4') }}</span>{{ t('coaches_title') }}</h2>
-<div class="space-y-2 mb-3">
-  {% for c in coaches %}
-  <div class="bg-card rounded-lg border border-edge px-3 py-2.5 flex items-center gap-3 {{ '' if c.active else 'opacity-60' }}">
-    <span class="av !rounded-lg" style="background: {{ pal[c.id % 6] }}">{{ c.name[0] }}</span>
-    <div class="flex-1 min-w-0">
-      <div class="font-bold truncate">{{ c.name }}{% if not c.active %} <span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}</div>
-      <div class="text-[11px] text-dim num">
-        {{ t('salary_monthly') if c.salary_type=='monthly' else t('salary_session') }} · {{ c.salary_amount }} JD
-        · {{ t('sessions_this_month', n=c.sessions) }} · {{ t('cost_this_month') }} {{ c.cost }} JD
+  <!-- the books for the month -->
+  <section class="statement">
+    <div class="ledger" style="--cols:1">
+      <div>
+        <div class="k">{{ t('d_cash_box') }}</div>
+        <div class="v big num {{ 'bad-hi' if balance < 0 }}">{{ money(balance) }}<span class="u">JD</span></div>
+        <div class="s">{{ t('d_cash_box_sub') }}{% if runway %} · <span class="num">{{ t('m_runway', n=runway) }}</span>{% endif %}</div>
       </div>
     </div>
-    <div class="flex items-center gap-1.5 shrink-0">
-      {% if c.phone %}<a href="https://wa.me/{{ wa_num(c.phone) }}" target="_blank" class="w-8 h-8 grid place-items-center rounded-lg text-white" style="background:#25D366">{{ icon('whatsapp','w-4 h-4') }}</a>{% endif %}
-      <button onclick="togglePresent({{ c.id }}, this)"
-              class="present-btn w-8 h-8 grid place-items-center rounded-lg border transition {{ 'bg-ok text-white border-ok' if c.present_today else 'bg-card2 border-edge text-dim' }}"
-              title="{{ t('present_today_btn') }}">{{ icon('check','w-4 h-4') }}</button>
-      <details class="relative">
-        <summary class="w-8 h-8 grid place-items-center rounded-lg bg-card2 border border-edge text-dim cursor-pointer">{{ icon('edit','w-3.5 h-3.5') }}</summary>
-        <div class="absolute z-20 end-0 mt-1 w-64 bg-card border border-edge rounded-lg p-3" style="box-shadow:var(--shadow)">
-          {{ coach_form(c) }}
+    <div class="ledger ledger-rule m-led4" style="--cols:2">
+      <div>
+        <div class="k">{{ t('m_received') }}</div>
+        <div class="v mid num">{{ money(fin.revenue) }}<span class="u">JD</span></div>
+        <div class="s">{{ t('m_received_sub') }}</div>
+      </div>
+      <div>
+        <div class="k">{{ t('m_earned') }}</div>
+        <div class="v mid num hi">{{ money(fin.earned) }}<span class="u">JD</span></div>
+        <div class="s num">{{ t('m_earned_sub', n=sessions_held) }}</div>
+      </div>
+      <div>
+        <div class="k">{{ t('m_costs') }}</div>
+        <div class="v mid num">{{ money(fin.expenses) }}<span class="u">JD</span></div>
+        <div class="s num">{{ t('fin_salaries') }} {{ money(fin.salaries) }} · {{ t('fin_other') }} {{ money(fin.other) }}</div>
+      </div>
+      <div>
+        <div class="k">{{ t('fin_profit') }}</div>
+        <div class="v mid num {{ 'ok-hi' if fin.profit >= 0 else 'bad-hi' }}">{{ money(fin.profit) }}<span class="u">JD</span></div>
+        <div class="s num">{{ t('m_on_earned') }} {{ money(fin.earned_profit) }}{% if fin.margin is not none %} · {{ t('fin_margin') }} {{ fin.margin }}%{% endif %}</div>
+      </div>
+    </div>
+    <div class="sheet-ft sub" style="border-color:rgba(255,255,255,.09)">{{ icon('alert','w-4 h-4 shrink-0') }}<span>{{ t('m_why_differ') }}</span></div>
+  </section>
+
+  <!-- weekly: cash in lumps vs steady earnings -->
+  {% set wmax = [weekly|map(attribute='cash')|max, weekly|map(attribute='earned')|max, 1]|max %}
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('m_weekly_title') }}</h2>
+      <span class="meta"><span class="flex items-center gap-1.5"><i class="swatch" style="background:rgb(var(--ink-2))"></i>{{ t('m_received') }}</span>
+        <span class="flex items-center gap-1.5"><i class="swatch" style="background:rgb(var(--acc))"></i>{{ t('m_earned') }}</span></span></div>
+    <div class="sheet-bd" dir="ltr">
+      <svg viewBox="0 0 320 132" class="w-full h-auto max-h-[190px] block mx-auto" role="img" aria-label="{{ t('m_weekly_title') }}">
+        {% for g in [0, 0.5, 1] %}
+        <line class="wk-grid" x1="28" x2="318" y1="{{ 10 + 100 * (1 - g) }}" y2="{{ 10 + 100 * (1 - g) }}" {% if g == 0 %}style="stroke:rgb(var(--rule-strong))"{% endif %}/>
+        <text class="wk-lbl" x="24" y="{{ 13 + 100 * (1 - g) }}" text-anchor="end">{{ money(wmax * g) }}</text>
+        {% endfor %}
+        {% for w in weekly %}
+        {% set x = 34 + loop.index0 * 36 %}
+        {% set hc = 100 * w.cash / wmax %}{% set he = 100 * w.earned / wmax %}
+        <rect class="wk-cash" x="{{ x }}" y="{{ 110 - hc }}" width="12" height="{{ hc }}"><title>{{ w.d }} · {{ t('m_received') }} {{ money(w.cash) }} JD</title></rect>
+        <rect class="wk-earn" x="{{ x + 14 }}" y="{{ 110 - he }}" width="12" height="{{ he }}"><title>{{ w.d }} · {{ t('m_earned') }} {{ money(w.earned) }} JD</title></rect>
+        <text class="wk-lbl" x="{{ x + 13 }}" y="124" text-anchor="middle">{{ w.d }}</text>
+        {% endfor %}
+      </svg>
+    </div>
+    <div class="sheet-ft sub">{{ t('m_weekly_hint') }}</div>
+  </section>
+
+  <div class="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
+    {% if projection %}
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('d_month_lands') }}</h2>
+        <span class="meta mid num !text-[18px] {{ 'text-bad' if projection.landing < 0 else 'text-ok' }}">{{ money(projection.landing) }} JD</span></div>
+      <div class="rows">
+        <div class="row" style="min-height:44px"><span class="flex-1">{{ t('d_received') }}</span><span class="num">+{{ money(projection.received) }}</span></div>
+        <div class="row" style="min-height:44px"><span class="flex-1">{{ t('d_expected') }}</span><span class="num text-accent">+{{ money(projection.expected_in) }}</span></div>
+        <div class="row" style="min-height:44px"><span class="flex-1">{{ t('m_costs_full') }}</span><span class="num text-bad">−{{ money(projection.costs) }}</span></div>
+      </div>
+      {% if projection.due %}
+      <div class="sheet-hd ledger-rule" style="min-height:38px"><h3 class="label">{{ t('m_due_list') }}</h3><span class="meta num">{{ projection.due|length }}</span></div>
+      <div class="rows">
+        {% for d in projection.due %}
+        <a href="/players/{{ d.id }}" class="row" style="min-height:44px">
+          <span class="flex-1 truncate font-semibold">{{ d.name }}</span>
+          {{ tally(d.used, d.total, warn=True, anim=False) }}<span class="sub">{{ dmon(d.date, lang) }}</span>
+          <span class="num w-14 text-end">{{ money(d.amount) }}</span></a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="sheet" id="owed">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('d_owed') }}</h2><span class="meta num">{{ money(owed.total) }} JD</span></div>
+      <div class="rows">
+        {% for r in owed.rows %}
+        <div class="row">
+          <a href="/players/{{ r.id }}" class="flex-1 min-w-0">
+            <div class="font-bold truncate">{{ r.name }}</div>
+            <div class="sub num">
+              {% if r.balance %}{{ t('d_balance_left', n=money(r.balance)) }}{% endif %}{% if r.balance and r.unpaid %} · {% endif %}
+              {% if r.unpaid %}<span class="text-bad">{{ t('d_unpaid_session' if r.unpaid == 1 else 'd_unpaid_sessions', n=r.unpaid) }}</span>{% endif %}</div>
+          </a>
+          <div class="end">
+            <span class="num font-bold">{{ money(r.total) }}</span>
+            {% if r.wa %}<a href="{{ r.wa }}" target="_blank" rel="noopener" class="btn btn-line btn-sm btn-icon" aria-label="{{ t('whatsapp') }}">{{ icon('whatsapp','w-4 h-4') }}</a>{% endif %}
+          </div>
+        </div>
+        {% else %}<div class="empty">{{ t('d_nobody_owes') }}</div>{% endfor %}
+      </div>
+      {% if owed.rows %}<div class="sheet-ft sub num">{{ t('m_owed_split', b=money(owed.balances), u=money(owed.unpaid_value), p=money(owed.per_session)) }}</div>{% endif %}
+    </section>
+  </div>
+
+  <!-- coaches & salaries -->
+  <section class="sheet" id="coaches">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('coaches_title') }}</h2>
+      <span class="meta">{% if salaries_owed.total %}<span class="tag tag-warn num">{{ t('m_salaries_owed', n=money(salaries_owed.total)) }}</span>{% endif %}
+        <button type="button" class="btn btn-line btn-xs" onclick="openSheet('coachNew')">{{ icon('plus','w-3.5 h-3.5') }}{{ t('add_coach') }}</button></span></div>
+    <div class="rows">
+      {% for c in coaches %}
+      {% set s = c.salary %}
+      <div class="{{ '' if c.active else 'opacity-60' }}">
+        <div class="row">
+          {{ initials(c.name) }}
+          <div class="flex-1 min-w-0">
+            <div class="font-bold truncate flex items-center gap-2">{{ c.name }}
+              {% if not c.active %}<span class="tag tag-mute">{{ t('st_left') }}</span>
+              {% elif s.state == 'paid' %}<span class="tag tag-ok">{{ t('m_paid') }}</span>
+              {% elif s.state == 'partial' %}<span class="tag tag-warn">{{ t('m_partial') }}</span>
+              {% elif s.state == 'due' %}<span class="tag tag-bad">{{ t('m_due') }}</span>
+              {% else %}<span class="tag tag-mute">{{ t('m_nothing_due') }}</span>{% endif %}</div>
+            <div class="sub num">{{ t('salary_monthly') if c.salary_type=='monthly' else t('salary_session') }} · {{ money(c.salary_amount) }} JD · {{ t('sessions_this_month', n=c.sessions) }}</div>
+            <div class="sub num mt-0.5">{{ t('m_due') }} <b class="text-ink">{{ money(s.due) }}</b> · {{ t('m_paid') }} <b class="text-ink">{{ money(s.paid) }}</b>{% if s.left %} · {{ t('m_left') }} <b class="text-bad">{{ money(s.left) }}</b>{% endif %}</div>
+          </div>
+          <div class="end">
+            {% if is_current and c.active %}
+            <button type="button" onclick="togglePresent({{ c.id }}, this)" aria-pressed="{{ 'true' if c.present_today else 'false' }}"
+                    class="btn btn-sm btn-icon {{ 'btn-ink' if c.present_today else 'btn-line' }}" title="{{ t('present_today_btn') }}" aria-label="{{ t('present_today_btn') }}">{{ icon('check','w-4 h-4') }}</button>
+            {% endif %}
+            {% if c.phone %}<a href="https://wa.me/{{ wa_num(c.phone) }}" target="_blank" rel="noopener" class="btn btn-line btn-sm btn-icon" aria-label="{{ t('whatsapp') }}">{{ icon('whatsapp','w-4 h-4') }}</a>{% endif %}
+            <button type="button" class="btn btn-line btn-sm btn-icon" onclick="openSheet('coachEdit{{ c.id }}')" aria-label="{{ t('edit') }}">{{ icon('edit','w-3.5 h-3.5') }}</button>
+            {% if s.left > 0 %}<button type="button" class="btn btn-ink btn-sm" onclick="openSheet('pay{{ c.id }}')">{{ t('m_pay') }}</button>{% endif %}
+          </div>
+        </div>
+        {% for po in c.payouts %}
+        <div class="flex items-center gap-3 px-4 py-1.5 ps-[64px] text-[12.5px] text-dim">
+          <span class="num">{{ po.date }}</span><span>{{ t(po.method) if po.method in ['cash','cliq','other'] else po.method }}</span>
+          <span class="num ms-auto text-ink font-semibold">{{ money(po.amount) }} JD</span>
+          <form method="post" action="/salary/{{ po.id }}/delete" onsubmit="return confirm({{ t('m_confirm_undo_pay')|tojson }})">
+            <button class="btn btn-quiet btn-xs">{{ t('m_undo') }}</button></form>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div id="pay{{ c.id }}" class="ovl" role="dialog" aria-label="{{ t('m_pay_title', n=c.name) }}">
+        <div class="panel">
+          <div class="panel-hd"><h3>{{ t('m_pay_title', n=c.name) }}</h3>
+            <button type="button" class="btn btn-line btn-sm btn-icon ms-auto" onclick="closeSheet('pay{{ c.id }}')" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+          <form method="post" action="/coaches/{{ c.id }}/pay" class="panel-bd grid gap-3">
+            <input type="hidden" name="month" value="{{ month }}">
+            <div class="sub num">{{ month }} · {{ t('m_due') }} {{ money(s.due) }} · {{ t('m_paid') }} {{ money(s.paid) }}</div>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="field"><span class="label">{{ t('amount') }}</span>
+                <input name="amount" type="number" step="0.5" min="0" value="{{ s.left }}" class="inp num"></label>
+              <label class="field"><span class="label">{{ t('date') }}</span>
+                <input name="date" type="date" value="{{ today }}" class="inp num"></label>
+            </div>
+            <label class="field"><span class="label">{{ t('method') }}</span>
+              <select name="method" class="inp"><option value="cash">{{ t('cash') }}</option><option value="cliq">{{ t('cliq') }}</option><option value="other">{{ t('other') }}</option></select></label>
+            <button class="btn btn-ink btn-block">{{ t('m_record_pay') }}</button>
+          </form>
+        </div>
+      </div>
+      <div id="coachEdit{{ c.id }}" class="ovl" role="dialog" aria-label="{{ c.name }}">
+        <div class="panel">
+          <div class="panel-hd"><h3>{{ c.name }}</h3>
+            <button type="button" class="btn btn-line btn-sm btn-icon ms-auto" onclick="closeSheet('coachEdit{{ c.id }}')" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+          <div class="panel-bd">{{ coach_form(c) }}</div>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty">{{ t('no_coaches') }}</div>
+      {% endfor %}
+    </div>
+  </section>
+  <div id="coachNew" class="ovl" role="dialog" aria-label="{{ t('add_coach') }}">
+    <div class="panel">
+      <div class="panel-hd"><h3>{{ t('add_coach') }}</h3>
+        <button type="button" class="btn btn-line btn-sm btn-icon ms-auto" onclick="closeSheet('coachNew')" aria-label="{{ t('close') }}">{{ icon('x','w-4 h-4') }}</button></div>
+      <div class="panel-bd">{{ coach_form(none) }}</div>
+    </div>
+  </div>
+
+  <!-- session costs: court bookings + water with quantities -->
+  <section class="sheet" id="session-log-wrap">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('m_session_log') }}</h2><span class="meta">{{ t('m_session_log_sub') }}</span></div>
+    {% include "_session_log.html" %}
+    {% if today_costs %}
+    <div class="ledger-rule rows">
+      {% for e in today_costs %}
+      <div class="row" style="min-height:40px"><span class="flex-1 text-[13.5px]">{{ e.note }}</span>
+        <span class="sub num">{{ (e.qty or 1)|round(1)|replace('.0','') }} × {{ money(e.unit_price if e.unit_price is not none else e.amount) }}</span>
+        <span class="num font-bold w-16 text-end">{{ money(e.amount) }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- expenses -->
+  <section class="sheet" id="expenses">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('expenses_title') }}</h2><span class="meta num">{{ money(fin.other) }} JD</span></div>
+
+    {% if breakdown %}
+    <div class="sheet-bd grid gap-2">
+      {% for b in breakdown %}
+      <div class="flex items-center gap-3 text-[13px]">
+        <span class="w-28 shrink-0 truncate">{{ t('exp_cat_' ~ b.category) }}</span>
+        <div class="bar flex-1"><i style="width: {{ b.share }}%"></i></div>
+        <span class="num w-24 text-end shrink-0">{{ money(b.total) }} <span class="text-faint">{{ b.share }}%</span></span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/expenses/save" class="sheet-bd ledger-rule grid grid-cols-2 gap-3">
+      <label class="field"><span class="label">{{ t('expense_category') }}</span>
+        <select name="category" class="inp">
+          {% for c in categories %}<option value="{{ c }}">{{ t('exp_cat_' ~ c) }}</option>{% endfor %}
+        </select></label>
+      <label class="field"><span class="label">{{ t('expense_amount') }}</span>
+        <input name="amount" type="number" step="0.5" min="0" required class="inp num"></label>
+      <label class="field col-span-2 sm:col-span-1"><span class="label">{{ t('expense_note') }}</span>
+        <input name="note" class="inp"></label>
+      <label class="field col-span-2 sm:col-span-1"><span class="label">{{ t('date') }}</span>
+        <input name="date" type="date" value="{{ today }}" class="inp num"></label>
+      <div class="col-span-2 flex items-center gap-3 flex-wrap">
+        {{ kind_seg(0, 'new') }}
+        <button class="btn btn-ink ms-auto">{{ icon('plus','w-4 h-4') }}{{ t('add_expense') }}</button>
+      </div>
+    </form>
+
+    {% if prev_count and not expenses %}
+    <form method="post" action="/expenses/copy" class="sheet-bd ledger-rule">
+      <input type="hidden" name="from_month" value="{{ prev_month }}"><input type="hidden" name="to_month" value="{{ month }}">
+      <button class="btn btn-line btn-block btn-sm">{{ t('copy_last_month', n=prev_count, m=prev_month) }}</button>
+    </form>
+    {% endif %}
+
+    <div class="rows ledger-rule">
+      {% for e in expenses %}
+      <details>
+        <summary class="row">
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold truncate flex items-center gap-2">{{ e.note or t('exp_cat_' ~ (e.category or 'other')) }}
+              {% if e.kind == 1 %}<span class="tag tag-acc">{{ t('monthly_tag') }}</span>{% elif e.kind == 2 %}<span class="tag tag-acc">{{ t('m_per_session') }}</span>{% endif %}
+              {% if e.end_date %}<span class="tag tag-mute">{{ t('m_stopped') }}</span>{% endif %}</div>
+            <div class="sub">{{ dmon(e.date, lang) }} · {{ t('exp_cat_' ~ (e.category or 'other')) }}
+              {% if e.kind == 2 %} · {{ e.sessions }} × {{ money(e.unit) }}{% elif e.qty and e.unit_price is not none %} · {{ e.qty|round(1)|replace('.0','') }} × {{ money(e.unit_price) }}{% endif %}</div>
+          </div>
+          <span class="num font-bold">−{{ money(e.amount) }}</span>
+          <span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span>
+        </summary>
+        <div class="sheet-bd border-t border-edge2" style="background:rgb(var(--sheet-2))">
+          <form method="post" action="/expenses/{{ e.id }}/edit" class="grid grid-cols-2 gap-3">
+            <label class="field"><span class="label">{{ t('expense_category') }}</span>
+              <select name="category" class="inp inp-sm">
+                {% for c in categories %}<option value="{{ c }}" {% if (e.category or 'other')==c %}selected{% endif %}>{{ t('exp_cat_' ~ c) }}</option>{% endfor %}
+              </select></label>
+            <label class="field"><span class="label">{{ t('expense_amount') }}</span>
+              <input name="amount" type="number" step="0.5" min="0" value="{{ e.unit }}" class="inp inp-sm num"></label>
+            <label class="field"><span class="label">{{ t('expense_note') }}</span>
+              <input name="note" value="{{ e.note }}" class="inp inp-sm"></label>
+            <label class="field"><span class="label">{{ t('date') }}</span>
+              <input name="date" type="date" value="{{ e.date }}" class="inp inp-sm num"></label>
+            <div class="col-span-2 flex items-center gap-2 flex-wrap">
+              {% if e.kind == 2 %}<input type="hidden" name="kind" value="session"><span class="tag tag-acc">{{ t('m_per_session') }}</span>
+              {% else %}{{ kind_seg(e.kind, e.id) }}{% endif %}
+              <button class="btn btn-ink btn-sm ms-auto">{{ t('save') }}</button>
+            </div>
+          </form>
+          <div class="flex items-center gap-2 mt-3 flex-wrap">
+            {% if e.kind in (1, 2) %}
+              {% if e.end_date %}
+              <form method="post" action="/expenses/{{ e.id }}/resume"><button class="btn btn-line btn-xs">{{ icon('play','w-3.5 h-3.5') }}{{ t('m_resume') }}</button></form>
+              <span class="sub num">{{ t('m_stopped_on', d=e.end_date) }}</span>
+              {% else %}
+              <form method="post" action="/expenses/{{ e.id }}/stop"><button class="btn btn-line btn-xs">{{ icon('pause','w-3.5 h-3.5') }}{{ t('m_stop') }}</button></form>
+              {% endif %}
+            {% endif %}
+            <form method="post" action="/expenses/{{ e.id }}/delete" class="ms-auto" onsubmit="return confirm({{ t('confirm_delete_expense')|tojson }})">
+              <button class="btn btn-danger btn-xs">{{ t('delete_expense') }}</button></form>
+          </div>
         </div>
       </details>
+      {% else %}<div class="empty">{{ t('no_expenses') }}</div>{% endfor %}
     </div>
+  </section>
+
+  <div class="flex gap-2 flex-wrap">
+    <a href="/payments?month={{ month }}" class="btn btn-line btn-sm">{{ icon('file','w-4 h-4') }}{{ t('nav_payments') }}</a>
+    <a href="/analytics" class="btn btn-line btn-sm">{{ icon('analytics','w-4 h-4') }}{{ t('nav_analytics') }}</a>
   </div>
-  {% else %}
-  <div class="text-center text-dim text-sm py-3">{{ t('no_coaches') }}</div>
-  {% endfor %}
-</div>
-<details class="bg-card rounded-lg border border-dashed border-edge mb-6">
-  <summary class="px-4 py-3 flex items-center gap-2 cursor-pointer text-accent font-semibold">{{ icon('plus-circle','w-5 h-5') }}{{ t('add_coach') }}</summary>
-  <div class="px-4 pb-4 pt-1 border-t border-edge2">{{ coach_form(none) }}</div>
-</details>
-
-<!-- expenses -->
-<h2 class="font-bold text-ink flex items-center gap-2 mb-2"><span class="text-accent">{{ icon('wallet','w-4 h-4') }}</span>{{ t('expenses_title') }}</h2>
-
-<!-- where the money went -->
-{% if breakdown %}
-<div class="bg-card rounded-lg border border-edge p-3.5 mb-2">
-  <div class="label-xs mb-2.5">{{ t('where_money_goes') }}</div>
-  {% for b in breakdown %}
-  <div class="flex items-center gap-2.5 mb-2">
-    <div class="w-24 text-xs truncate shrink-0">{{ t('exp_cat_' ~ b.category) }}</div>
-    <div class="flex-1 h-2.5 rounded-full bg-card3 overflow-hidden">
-      <div class="h-full rounded-full" style="width: {{ b.share }}%; background:linear-gradient(90deg,rgb(var(--bad)),rgb(var(--warn)))"></div>
-    </div>
-    <div class="w-24 text-end text-xs num shrink-0">{{ b.total }} JD <span class="text-faint">{{ b.share }}%</span></div>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
-
-<!-- add expense -->
-<form method="post" action="/expenses/save" class="bg-card rounded-lg border border-edge p-3 mb-2 grid grid-cols-12 gap-2">
-  <select name="category" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
-    {% for c in categories %}<option value="{{ c }}">{{ t('exp_cat_' ~ c) }}</option>{% endfor %}
-  </select>
-  <input name="amount" type="number" step="0.5" required placeholder="{{ t('expense_amount') }}" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
-  <input name="note" placeholder="{{ t('expense_note') }}" class="col-span-7 bg-bg border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
-  <input name="date" type="date" value="{{ today }}" class="col-span-5 bg-bg border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
-  <label class="col-span-12 flex items-center gap-2 text-xs text-dim">
-    <input type="checkbox" name="recurring"> {{ t('expense_recurring') }}
-  </label>
-  <button class="col-span-12 bg-accent text-bg font-semibold rounded-md py-2 text-sm">{{ t('add_expense') }}</button>
-</form>
-
-{% if prev_count and not expenses %}
-<form method="post" action="/expenses/copy" class="mb-2">
-  <input type="hidden" name="from_month" value="{{ prev_month }}"><input type="hidden" name="to_month" value="{{ month }}">
-  <button class="w-full bg-card2 hover:bg-card3 border border-dashed border-edge rounded-md py-2 text-xs font-semibold text-accent">
-    {{ t('copy_last_month', n=prev_count, m=prev_month) }}</button>
-</form>
-{% endif %}
-
-<!-- expense list (tap to edit) -->
-<div class="bg-card rounded-lg border border-edge divide-y divide-edge2 mb-6">
-  {% for e in expenses %}
-  <details>
-    <summary class="px-3 py-2.5 flex items-center justify-between text-sm cursor-pointer select-none">
-      <div class="min-w-0">
-        <div class="font-semibold truncate flex items-center gap-1.5">{{ e.note or t('exp_cat_' ~ (e.category or 'other')) }}
-          {% if 'recurring' in e.keys() and e.recurring %}<span class="pill pill-violet">{{ t('monthly_tag') }}</span>{% endif %}</div>
-        <div class="text-[11px] text-dim num">{{ e.date }} · {{ t('exp_cat_' ~ (e.category or 'other')) }}</div>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <span class="font-bold num text-bad">-{{ e.amount }} JD</span>
-        <span class="text-faint">{{ icon('edit','w-3.5 h-3.5') }}</span>
-      </div>
-    </summary>
-    <div class="px-3 pb-3 pt-1 border-t border-edge2">
-      <form method="post" action="/expenses/{{ e.id }}/edit" class="grid grid-cols-12 gap-2 text-sm">
-        <select name="category" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 focus:border-accent outline-none">
-          {% for c in categories %}<option value="{{ c }}" {% if (e.category or 'other')==c %}selected{% endif %}>{{ t('exp_cat_' ~ c) }}</option>{% endfor %}
-        </select>
-        <input name="amount" type="number" step="0.5" value="{{ e.amount }}" class="col-span-6 bg-bg border border-edge rounded-md px-2 py-2 num focus:border-accent outline-none">
-        <input name="note" value="{{ e.note }}" placeholder="{{ t('expense_note') }}" class="col-span-7 bg-bg border border-edge rounded-md px-2 py-2 focus:border-accent outline-none">
-        <input name="date" type="date" value="{{ e.date }}" class="col-span-5 bg-bg border border-edge rounded-md px-2 py-2 num focus:border-accent outline-none">
-        <label class="col-span-12 flex items-center gap-2 text-xs text-dim">
-          <input type="checkbox" name="recurring" {% if 'recurring' in e.keys() and e.recurring %}checked{% endif %}> {{ t('expense_recurring') }}
-        </label>
-        <button class="col-span-12 bg-accent text-bg font-semibold rounded-md py-2 mt-0.5">{{ t('save') }}</button>
-      </form>
-      <form method="post" action="/expenses/{{ e.id }}/delete" class="text-center mt-2"
-            onsubmit="return confirm({{ t('confirm_delete_expense')|tojson }})">
-        <button class="text-bad text-xs font-medium">{{ t('delete_expense') }}</button>
-      </form>
-    </div>
-  </details>
-  {% else %}<div class="px-3 py-4 text-center text-dim text-sm">{{ t('no_expenses') }}</div>{% endfor %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 async function togglePresent(id, btn){
-  const r = await fetch(`/coaches/${id}/present`, {method:'POST'});
+  const r = await fetch(`/coaches/${id}/present`, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({date: {{ today|tojson }}})});
   if(!r.ok) return;
   const d = await r.json();
-  btn.className = 'present-btn w-8 h-8 grid place-items-center rounded-lg border transition '
-    + (d.present ? 'bg-ok text-white border-ok' : 'bg-card2 border-edge text-dim');
+  btn.classList.toggle('btn-ink', d.present); btn.classList.toggle('btn-line', !d.present);
+  btn.setAttribute('aria-pressed', d.present ? 'true' : 'false');
+  toast(d.present ? {{ t('m_marked_worked')|tojson }} : {{ t('m_unmarked_worked')|tojson }});
 }
 </script>
 {% endblock %}

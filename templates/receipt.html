@@ -1,47 +1,81 @@
+{% from "_logo.html" import logo %}
 <!DOCTYPE html>
 <html lang="{{ lang }}" dir="{{ dir }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ t('receipt_no') }} {{ pm.receipt_no }}</title>
+<link rel="icon" href="data:image/svg+xml,{{ logo_svg_uri }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Tajawal:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
-  @page { size: A6; margin: 8mm; }
-  body { font-family: 'Inter', 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif; background:#fff; color:#111;
-         font-variant-numeric: tabular-nums;
-         max-width: 105mm; margin: 0 auto; padding: 16px; }
-  .head { text-align:center; border-bottom: 2px solid #5B9BD5; padding-bottom: 8px; margin-bottom: 12px; }
-  .logo { font-size: 28px; font-weight: 900; }
-  .logo span { color:#5B9BD5; }
-  table { width:100%; font-size: 14px; border-collapse: collapse; }
-  td { padding: 5px 0; }
-  td:last-child { text-align:{{ 'left' if dir == 'rtl' else 'right' }}; font-weight:bold; }
-  .amount { font-size: 22px; color:#2e7d32; }
-  .foot { text-align:center; color:#777; font-size:11px; margin-top:14px; }
-  .noprint { text-align:center; margin-top:16px; }
-  @media print { .noprint { display:none; } }
+  @page { size: A6; margin: 7mm; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#EEF0F3; color:#14161B; font-family:Montserrat, Tajawal, system-ui, sans-serif; font-weight:500;
+         -webkit-font-smoothing:antialiased; padding:24px 16px; }
+  [dir="rtl"] body { font-family:Tajawal, Montserrat, system-ui, sans-serif; }
+  .slip { max-width:380px; margin:0 auto; background:#FAFBFC; border:1px solid #D6DAE1; border-radius:4px; }
+  .head { display:flex; align-items:center; gap:14px; padding:18px 20px; border-bottom:1px solid #D6DAE1; }
+  .da-mark { width:64px; height:auto; display:block; } .da-mark .d { fill:#6EA3EE; } .da-mark .a { fill:#4A4B50; }
+  .wm { font-family:Montserrat, sans-serif; font-weight:800; letter-spacing:.14em; font-size:12px; color:#4A4B50; }
+  .sm { font-size:11.5px; color:#626873; margin-top:3px; }
+  .rno { margin-inline-start:auto; text-align:end; }
+  .k { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#626873; }
+  [dir="rtl"] .k { letter-spacing:0; font-size:12px; }
+  .num { font-variant-numeric:tabular-nums lining-nums; direction:ltr; unicode-bidi:isolate; font-family:Montserrat, sans-serif; }
+  .amount { padding:18px 20px; border-bottom:1px solid #D6DAE1; }
+  .amount .v { font-size:38px; font-weight:700; letter-spacing:-.02em; line-height:1; margin-top:8px; }
+  .amount .v small { font-size:14px; color:#626873; font-weight:600; margin-inline-start:4px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  td { padding:10px 20px; border-bottom:1px solid #E4E7EC; vertical-align:top; }
+  tr:last-child td { border-bottom:0; }
+  td:first-child { color:#626873; width:42%; }
+  td:last-child { text-align:end; font-weight:700; }
+  .tally { display:inline-flex; gap:3px; direction:ltr; margin-top:6px; }
+  .tally i { width:8px; height:11px; border:1.5px solid #B0B6C0; border-radius:1px; display:block; }
+  .foot { padding:14px 20px; border-top:1px solid #D6DAE1; text-align:center; font-size:12px; color:#626873; }
+  .actions { max-width:380px; margin:16px auto 0; display:flex; gap:8px; }
+  .btn { flex:1; height:44px; display:inline-flex; align-items:center; justify-content:center; border-radius:3px; font:inherit;
+         font-weight:700; font-size:14px; cursor:pointer; text-decoration:none; }
+  .btn-ink { background:#14161B; color:#FAFBFC; border:1px solid #14161B; }
+  .btn-line { background:#FAFBFC; color:#14161B; border:1px solid #B0B6C0; }
+  @media print { body { background:#fff; padding:0; } .slip { border:0; max-width:none; } .actions { display:none; } }
 </style>
 </head>
 <body>
-<div class="head">
-  <div class="logo">DA <span>— Dream Academy</span></div>
-  <div style="font-size:12px;color:#666">{{ t('academy_sub') }}</div>
+<div class="slip">
+  <div class="head">
+    {{ logo('') }}
+    <div>
+      <div class="wm">DREAM ACADEMY</div>
+      <div class="sm">{{ t('academy_sub') }}</div>
+    </div>
+    <div class="rno">
+      <div class="k">{{ t('receipt_no') }}</div>
+      <div class="num" style="font-weight:700;margin-top:4px">{{ pm.receipt_no or '-' }}</div>
+    </div>
+  </div>
+  <div class="amount">
+    <div class="k">{{ t('amount') }}</div>
+    <div class="v num">{{ '%g'|format(pm.amount) }}<small>JD</small></div>
+  </div>
+  <table>
+    <tr><td>{{ t('name') }}</td><td>{{ pm.full_name }}</td></tr>
+    <tr><td>{{ t('date') }}</td><td class="num">{{ pm.date }}</td></tr>
+    <tr><td>{{ t('method') }}</td><td>{{ t(pm.method) if pm.method in ['cash','cliq','other'] else pm.method }}</td></tr>
+    {% if sub %}
+    <tr><td>{{ t('subscription') }}</td><td class="num">{{ sub.start_date }} → {{ sub.expiry_date }}</td></tr>
+    <tr><td>{{ t('sessions_count') }}</td><td><span class="num">{{ sub.sessions_total }}</span>
+      {% if sub.sessions_total <= 30 %}<br><span class="tally">{% for i in range(sub.sessions_total) %}<i></i>{% endfor %}</span>{% endif %}</td></tr>
+    {% endif %}
+    {% if pm.note %}<tr><td>{{ t('note') }}</td><td>{{ pm.note }}</td></tr>{% endif %}
+  </table>
+  <div class="foot">{{ t('thanks') }}</div>
 </div>
-<table>
-  <tr><td>{{ t('receipt_no') }}</td><td dir="ltr">{{ pm.receipt_no }}</td></tr>
-  <tr><td>{{ t('date') }}</td><td dir="ltr">{{ pm.date }}</td></tr>
-  <tr><td>{{ t('name') }}</td><td>{{ pm.full_name }}</td></tr>
-  <tr><td>{{ t('amount') }}</td><td class="amount">{{ pm.amount }} JD</td></tr>
-  <tr><td>{{ t('method') }}</td><td>{{ t(pm.method) if pm.method in ['cash','cliq','other'] else pm.method }}</td></tr>
-  {% if sub %}
-  <tr><td>{{ t('subscription') }}</td><td dir="ltr">{{ sub.start_date }} → {{ sub.expiry_date }}</td></tr>
-  <tr><td>{{ t('sessions_count') }}</td><td>{{ sub.sessions_total }}</td></tr>
-  {% endif %}
-  {% if pm.note %}<tr><td>{{ t('note') }}</td><td>{{ pm.note }}</td></tr>{% endif %}
-</table>
-<div class="foot">{{ t('thanks') }}</div>
-<div class="noprint">
-  <button onclick="window.print()" style="padding:10px 24px;font-size:16px;border-radius:8px;border:0;background:#5B9BD5;color:#fff;font-weight:bold">{{ t('print') }}</button>
-  <a href="javascript:history.back()" style="margin:0 12px">{{ t('back') }}</a>
+<div class="actions">
+  <button class="btn btn-ink" onclick="window.print()">{{ t('print') }}</button>
+  <a class="btn btn-line" href="javascript:history.back()">{{ t('back') }}</a>
 </div>
 </body>
 </html>

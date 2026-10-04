@@ -20,5 +20,14 @@ echo      Laptop:  http://127.0.0.1:8000
 echo      QR page: http://127.0.0.1:8000/qr
 echo.
 
-"%~dp0venv\Scripts\python.exe" app.py
+rem -- the venv launcher can break when the base Python moves; fall back to
+rem    Python 3.11 using the venv's installed packages --
+"%~dp0venv\Scripts\python.exe" -c "pass" >nul 2>&1
+if %errorlevel%==0 (
+    "%~dp0venv\Scripts\python.exe" app.py
+) else (
+    echo  [i] venv Python unavailable - using Python 3.11 with the project packages.
+    set "PYTHONPATH=%~dp0venv\Lib\site-packages"
+    "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" app.py
+)
 pause

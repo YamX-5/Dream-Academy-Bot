@@ -1,101 +1,113 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_ui.html" import tally, initials %}
 {% block title %}{{ t('players_title') }}{% endblock %}
+{% macro qs(group=f_group, status=f_status, renewal=f_renewal) -%}
+?{% if q %}q={{ q|urlencode }}&{% endif %}{% if group %}group={{ group }}&{% endif %}{% if f_gender %}gender={{ f_gender }}&{% endif %}{% if status %}status={{ status }}&{% endif %}{% if renewal %}renewal=1{% endif %}
+{%- endmacro %}
 {% block content %}
-<div class="flex items-center justify-between gap-2 mb-4">
-  <h1 class="text-xl font-bold text-ink">{{ t('players_title') }}</h1>
-  <div class="flex items-center gap-2">
-    <a href="/groups" class="flex items-center gap-1.5 bg-card border border-edge hover:border-accent/50 text-ink px-3 py-2 rounded-md text-sm font-semibold transition">
-      {{ icon('grid','w-4 h-4') }}{{ t('nav_groups') }}</a>
-    <a href="/players/new" class="flex items-center gap-1.5 bg-accent text-bg font-semibold px-3.5 py-2 rounded-md text-sm transition">
-      {{ icon('plus','w-4 h-4') }}{{ t('new_player') }}</a>
-  </div>
-</div>
-
-<form method="get" class="space-y-2 mb-4">
-  <div class="relative">
-    <span class="absolute {{ 'right-3' if dir == 'rtl' else 'left-3' }} top-1/2 -translate-y-1/2 text-dim">{{ icon('search','w-4 h-4') }}</span>
-    <input name="q" value="{{ q }}" placeholder="{{ t('search_ph') }}"
-           class="w-full bg-card border border-edge rounded-lg {{ 'pr-10 pl-4' if dir == 'rtl' else 'pl-10 pr-4' }} py-3 focus:border-accent outline-none transition" />
-  </div>
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-    <select name="group" class="bg-card border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
-      <option value="">{{ t('all_groups') }}</option>
-      {% for g in groups %}<option value="{{ g.id }}" {% if f_group|string == g.id|string %}selected{% endif %}>{{ g.name_ar if lang == 'ar' else g.name_en }}</option>{% endfor %}
-    </select>
-    <select name="gender" class="bg-card border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
-      <option value="">{{ t('all') }}</option>
-      <option value="M" {% if f_gender=='M' %}selected{% endif %}>{{ t('males') }}</option>
-      <option value="F" {% if f_gender=='F' %}selected{% endif %}>{{ t('females') }}</option>
-    </select>
-    <select name="status" class="bg-card border border-edge rounded-lg px-2 py-2 focus:border-accent outline-none">
-      <option value="">{{ t('all_statuses') }}</option>
-      <option value="pending" {% if f_status=='pending' %}selected{% endif %}>{{ t('pending_badge') }}</option>
-      <option value="active" {% if f_status=='active' %}selected{% endif %}>{{ t('st_active') }}</option>
-      <option value="frozen" {% if f_status=='frozen' %}selected{% endif %}>{{ t('st_frozen') }}</option>
-      <option value="left" {% if f_status=='left' %}selected{% endif %}>{{ t('st_left') }}</option>
-    </select>
-    <label class="flex items-center gap-2 bg-card border border-edge rounded-lg px-3 py-2">
-      <input type="checkbox" name="renewal" value="1" {% if f_renewal %}checked{% endif %} class="accent-accent"> {{ t('needs_renewal') }}
-    </label>
-  </div>
-  <button class="bg-card2 hover:bg-card3 border border-edge px-4 py-2 rounded-lg text-sm transition">{{ t('apply_filter') }}</button>
-</form>
-
-{% from "_icons.html" import icon %}
-{% set avatar_palette = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
-<div class="space-y-2">
-  {% for item in players %}
-  {% set p = item.p %}{% set info = item.info %}
-  {% set parts = p.full_name.split() %}
-  <div class="flex items-center gap-3 bg-card rounded-lg px-3 py-2.5 border transition hover:border-accent/40
-     {{ 'border-bad/40' if info.needs_renewal else 'border-edge' }}">
-    <a href="/players/{{ p.id }}" class="flex items-center gap-3 flex-1 min-w-0">
-      <span class="av !rounded-lg" style="background: {{ avatar_palette[p.id % 6] }}">{{ parts[0][0] }}{{ parts[1][0] if parts|length > 1 else '' }}</span>
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2">
-          <span class="font-bold truncate">{{ p.full_name }}</span>
-          {% if p.status=='pending' %}<span class="pill pill-warn">{{ t('pending_badge') }}</span>{% endif %}
-          {% if p.status=='frozen' %}<span class="pill pill-sky">{{ t('st_frozen') }}</span>{% endif %}
-          {% if p.status=='left' %}<span class="pill pill-muted">{{ t('st_left') }}</span>{% endif %}
-          {% if not p.trial_used and not info.active %}<span class="pill pill-ok">{{ t('trial_tag') }}</span>{% endif %}
-        </div>
-        <div class="text-[11px] mt-0.5 num {{ 'text-bad' if not info.active else ('text-warn' if info.needs_renewal else 'text-dim') }}">
-          {% if info.active %}
-            {{ t('left_expires', n=info.left, d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7]) }}
-          {% else %}{{ t('no_active_sub') }}{% endif %}
-          <span class="text-faint"> · {{ p.group_name or '—' }}</span>
-        </div>
-      </div>
-    </a>
-    <div class="flex items-center gap-1.5 shrink-0">
-      {% if p.guardian_phone %}
-      <a href="https://wa.me/{{ wa_num(p.guardian_phone) }}" target="_blank" title="{{ t('wa_guardian') }}"
-         class="relative w-9 h-9 grid place-items-center rounded-lg text-white" style="background:#25D366">
-        {{ icon('whatsapp','w-4 h-4') }}
-        <span class="absolute -top-1 -end-1 w-4 h-4 rounded-full bg-violet text-white text-[9px] font-bold grid place-items-center border-2 border-card">{{ icon('users','w-2.5 h-2.5') }}</span>
-      </a>
-      {% endif %}
-      {% if p.phone %}
-      <a href="https://wa.me/{{ wa_num(p.phone) }}" target="_blank" title="{{ t('wa_player') }}"
-         class="w-9 h-9 grid place-items-center rounded-lg text-white" style="background:#25D366">
-        {{ icon('whatsapp','w-4 h-4') }}
-      </a>
-      {% endif %}
+{% set gname = {} %}{% for g in groups %}{% set _ = gname.update({g.id: (g.name_ar if lang == 'ar' else g.name_en)}) %}{% endfor %}
+<div class="stack">
+  <div class="flex items-end gap-3 flex-wrap">
+    <div>
+      <h1 class="h-page">{{ t('players_title') }}</h1>
+      <div class="sub mt-1 num">{{ t('p_showing', n=players|length) }}</div>
+    </div>
+    <div class="ms-auto flex gap-2">
+      <a href="/groups" class="btn btn-line btn-sm">{{ icon('grid','w-4 h-4') }}{{ t('nav_groups') }}</a>
+      <a href="/players/new" class="btn btn-ink btn-sm">{{ icon('plus','w-4 h-4') }}{{ t('new_player') }}</a>
     </div>
   </div>
-  {% else %}
-  <div class="text-center text-dim py-10">{{ t('no_results') }}</div>
-  {% endfor %}
-</div>
 
-<div class="mt-6 bg-card rounded-lg p-4 border border-edge">
-  <div class="flex items-center gap-2 font-semibold mb-2">{{ icon('upload','w-4 h-4') }}{{ t('import_title') }}</div>
-  <div class="text-xs text-dim mb-1">{{ t('import_hint_pre') }} <a href="/import/template" class="text-accent underline">{{ t('import_hint_link') }}</a>{{ t('import_hint_post') }}</div>
-  <div class="text-[11px] text-faint mb-3">{{ t('import_formats') }}</div>
-  <form method="post" action="/import/players" enctype="multipart/form-data" class="flex gap-2">
-    <input type="file" name="file" accept=".xlsx,.csv,.tsv,.txt" required class="text-sm flex-1 text-dim" />
-    <button class="bg-accent hover:bg-accent2 text-bg font-semibold px-4 py-2 rounded-lg text-sm transition">{{ t('import_btn') }}</button>
-  </form>
+  <section class="sheet">
+    <form method="get" class="sheet-bd flex gap-2">
+      {% if f_group %}<input type="hidden" name="group" value="{{ f_group }}">{% endif %}
+      {% if f_status %}<input type="hidden" name="status" value="{{ f_status }}">{% endif %}
+      {% if f_gender %}<input type="hidden" name="gender" value="{{ f_gender }}">{% endif %}
+      {% if f_renewal %}<input type="hidden" name="renewal" value="1">{% endif %}
+      <div class="relative flex-1">
+        <span class="absolute top-1/2 -translate-y-1/2 text-faint {{ 'right-3' if dir == 'rtl' else 'left-3' }}">{{ icon('search','w-4 h-4') }}</span>
+        <input name="q" value="{{ q }}" placeholder="{{ t('search_ph') }}" type="search"
+               class="inp {{ 'pr-10' if dir == 'rtl' else 'pl-10' }}" aria-label="{{ t('search_ph') }}">
+      </div>
+      <select name="gender" class="inp !w-auto" onchange="this.form.submit()" aria-label="{{ t('gender') }}">
+        <option value="">{{ t('all') }}</option>
+        <option value="M" {% if f_gender=='M' %}selected{% endif %}>{{ t('males') }}</option>
+        <option value="F" {% if f_gender=='F' %}selected{% endif %}>{{ t('females') }}</option>
+      </select>
+    </form>
+
+    <!-- groups -->
+    <div class="px-4 pb-3 chips" role="tablist" aria-label="{{ t('group') }}">
+      <a href="{{ qs(group='') }}" class="da-tab {{ 'on' if not f_group }}">{{ t('all_groups') }}</a>
+      {% for g in groups %}
+      <a href="{{ qs(group=g.id) }}" class="da-tab {{ 'on' if f_group|string == g.id|string }}">{{ gname[g.id] }}<span class="n num">{{ group_counts.get(g.id, 0) }}</span></a>
+      {% endfor %}
+    </div>
+
+    <!-- status -->
+    <div class="ledger-rule px-4 py-3 chips">
+      {% set st_all = (status_counts.get('active',0) + status_counts.get('frozen',0) + status_counts.get('pending',0) + status_counts.get('left',0)) %}
+      <a href="{{ qs(status='', renewal=False) }}" class="da-tab {{ 'on' if not f_status and not f_renewal }}">{{ t('all_statuses') }}<span class="n num">{{ st_all }}</span></a>
+      <a href="{{ qs(status='', renewal=True) }}" class="da-tab {{ 'on' if f_renewal }}">{{ icon('clock','w-3.5 h-3.5') }}{{ t('needs_renewal') }}</a>
+      {% for s, label in [('active', t('st_active')), ('frozen', t('st_frozen')), ('pending', t('pending_badge')), ('left', t('st_left'))] %}
+      <a href="{{ qs(status=s, renewal=False) }}" class="da-tab {{ 'on' if f_status == s }}">{{ label }}<span class="n num">{{ status_counts.get(s, 0) }}</span></a>
+      {% endfor %}
+    </div>
+
+    <div class="rows ledger-rule">
+      {% for item in players %}
+      {% set p = item.p %}{% set info = item.info %}
+      <div class="row">
+        <a href="/players/{{ p.id }}" class="flex items-center gap-3 flex-1 min-w-0">
+          {{ initials(p.full_name) }}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="font-bold truncate">{{ p.full_name }}</span>
+              {% if p.status=='pending' %}<span class="tag tag-warn">{{ t('pending_badge') }}</span>{% endif %}
+              {% if p.status=='frozen' %}<span class="tag tag-acc">{{ t('st_frozen') }}</span>{% endif %}
+              {% if p.status=='left' %}<span class="tag tag-mute">{{ t('st_left') }}</span>{% endif %}
+              {% if not p.trial_used and not info.sub %}<span class="tag tag-ok">{{ t('trial_tag') }}</span>{% endif %}
+            </div>
+            <div class="mt-1.5 flex items-center gap-2.5 flex-wrap">
+              {% if info.active %}
+                {{ tally(info.used, info.sub.sessions_total, warn=info.needs_renewal) }}
+                <span class="sub num {{ 'text-warn' if info.needs_renewal }}">
+                  {% if info.upcoming %}{{ t('p_starts', d=info.sub.start_date[8:10] ~ '/' ~ info.sub.start_date[5:7]) }}
+                  {% else %}{{ t('left_expires', n=info.left, d=info.sub.expiry_date[8:10] ~ '/' ~ info.sub.expiry_date[5:7]) }}{% endif %}</span>
+              {% else %}
+                <span class="sub {{ 'text-bad' if p.status == 'active' }}">{{ t('no_active_sub') }}</span>
+              {% endif %}
+              <span class="sub text-faint">· {{ gname.get(p.group_id) or p.group_name or '-' }}</span>
+            </div>
+          </div>
+        </a>
+        <div class="end">
+          {% if p.guardian_phone %}
+          <a href="https://wa.me/{{ wa_num(p.guardian_phone) }}" target="_blank" rel="noopener" class="btn btn-line btn-sm btn-icon" title="{{ t('wa_guardian') }}" aria-label="{{ t('wa_guardian') }}">{{ icon('whatsapp','w-4 h-4') }}</a>
+          {% elif p.phone %}
+          <a href="https://wa.me/{{ wa_num(p.phone) }}" target="_blank" rel="noopener" class="btn btn-line btn-sm btn-icon" title="{{ t('wa_player') }}" aria-label="{{ t('wa_player') }}">{{ icon('whatsapp','w-4 h-4') }}</a>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="empty">{{ t('no_results') }}
+        {% if q or f_group or f_status or f_renewal or f_gender %}<a href="/players" class="text-accent font-bold ms-1">{{ t('p_clear_filters') }}</a>{% endif %}</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('import_title') }}</h2>
+      <span class="meta"><a href="/export/all" class="text-accent font-bold flex items-center gap-1.5">{{ icon('download','w-4 h-4') }}{{ t('export_all') }}</a></span></div>
+    <div class="sheet-bd">
+      <div class="sub mb-1">{{ t('import_hint_pre') }} <a href="/import/template" class="text-accent underline">{{ t('import_hint_link') }}</a>{{ t('import_hint_post') }}</div>
+      <div class="sub text-faint mb-3">{{ t('import_formats') }}</div>
+      <form method="post" action="/import/players" enctype="multipart/form-data" class="flex gap-2 items-center flex-wrap">
+        <input type="file" name="file" accept=".xlsx,.csv,.tsv,.txt" required class="text-sm flex-1 min-w-0 text-dim">
+        <button class="btn btn-line btn-sm">{{ icon('upload','w-4 h-4') }}{{ t('import_btn') }}</button>
+      </form>
+    </div>
+  </section>
 </div>
 {% endblock %}

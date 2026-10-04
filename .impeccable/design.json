@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T00:00:00Z",
+  "title": "Design System: Dream Academy",
+  "extensions": {
+    "colorMeta": {
+      "paper":              { "role": "neutral", "displayName": "Platinum Paper",   "canonical": "rgb(238 240 243)", "dark": "rgb(13 15 19)",    "tonalRamp": ["#0D0F13", "#14171C", "#22262D", "#424852", "#8C929D", "#D6DAE1", "#EEF0F3", "#FAFBFC"] },
+      "sheet":              { "role": "neutral", "displayName": "Sheet White",      "canonical": "rgb(250 251 252)", "dark": "rgb(20 23 28)",    "tonalRamp": ["#14171C", "#1A1D23", "#22262D", "#B0B6C0", "#E4E7EC", "#EEF0F3", "#F4F5F7", "#FAFBFC"] },
+      "sheet-2":            { "role": "neutral", "displayName": "Sheet Wash",       "canonical": "rgb(244 245 247)", "dark": "rgb(26 29 35)",    "tonalRamp": ["#1A1D23", "#22262D", "#424852", "#8C929D", "#D6DAE1", "#E8EBEF", "#F4F5F7", "#FAFBFC"] },
+      "sheet-3":            { "role": "neutral", "displayName": "Sheet Shade",      "canonical": "rgb(232 235 239)", "dark": "rgb(34 38 45)",    "tonalRamp": ["#22262D", "#282C34", "#424852", "#8C929D", "#B0B6C0", "#D6DAE1", "#E8EBEF", "#F4F5F7"] },
+      "rule":               { "role": "neutral", "displayName": "Hairline",         "canonical": "rgb(214 218 225)", "dark": "rgb(40 44 52)",    "tonalRamp": ["#1F2229", "#282C34", "#424852", "#707680", "#B0B6C0", "#D6DAE1", "#E4E7EC", "#F4F5F7"] },
+      "rule-soft":          { "role": "neutral", "displayName": "Soft Hairline",    "canonical": "rgb(228 231 236)", "dark": "rgb(31 34 41)",    "tonalRamp": ["#1F2229", "#282C34", "#424852", "#8C929D", "#B0B6C0", "#D6DAE1", "#E4E7EC", "#F4F5F7"] },
+      "rule-strong":        { "role": "neutral", "displayName": "Strong Hairline",  "canonical": "rgb(176 182 192)", "dark": "rgb(66 72 82)",    "tonalRamp": ["#282C34", "#424852", "#626873", "#8C929D", "#B0B6C0", "#D6DAE1", "#E4E7EC", "#F4F5F7"] },
+      "ink":                { "role": "neutral", "displayName": "Graphite Ink",     "canonical": "rgb(20 22 27)",    "dark": "rgb(232 234 238)", "tonalRamp": ["#0D0F13", "#14161B", "#2A2B30", "#4A4B50", "#626873", "#8C929D", "#BEC2CA", "#E8EAEE"] },
+      "ink-2":              { "role": "neutral", "displayName": "Logo Charcoal",    "canonical": "rgb(74 75 80)",    "dark": "rgb(190 194 202)", "tonalRamp": ["#14161B", "#2A2B30", "#4A4B50", "#626873", "#8C929D", "#BEC2CA", "#D3D6DC", "#EEF0F3"] },
+      "muted":              { "role": "neutral", "displayName": "Muted Ink",        "canonical": "rgb(98 104 115)",  "dark": "rgb(140 146 157)", "tonalRamp": ["#1A1D23", "#2A2E35", "#424852", "#626873", "#8C929D", "#B0B6C0", "#D6DAE1", "#EEF0F3"] },
+      "faint":              { "role": "neutral", "displayName": "Faint Ink",        "canonical": "rgb(112 118 128)", "dark": "rgb(104 110 121)", "tonalRamp": ["#1A1D23", "#2A2E35", "#424852", "#707680", "#8C929D", "#B0B6C0", "#D6DAE1", "#EEF0F3"] },
+      "baby-blue":          { "role": "primary", "displayName": "Logo Baby Blue",   "canonical": "rgb(110 163 238)", "dark": "rgb(110 163 238)", "tonalRamp": ["#0B1626", "#163A6E", "#2660BA", "#4A86DA", "#6EA3EE", "#8DB8F3", "#B7D1F7", "#E2ECFC"] },
+      "baby-blue-text":     { "role": "primary", "displayName": "Scorer's Blue",    "canonical": "rgb(38 96 186)",   "dark": "rgb(134 180 244)", "tonalRamp": ["#0B1626", "#163A6E", "#2660BA", "#4A86DA", "#6EA3EE", "#86B4F4", "#B7D1F7", "#E2ECFC"] },
+      "ok":                 { "role": "status",  "displayName": "Paid Green",       "canonical": "rgb(24 128 78)",   "dark": "rgb(72 196 132)",  "onStatement": "#6FD69E", "tonalRamp": ["#08261A", "#0F4A2E", "#18804E", "#2FA068", "#48C484", "#6FD69E", "#A9E8C5", "#E0F6EA"] },
+      "warn":               { "role": "status",  "displayName": "Renewal Amber",    "canonical": "rgb(168 104 14)",  "dark": "rgb(226 166 66)",  "onStatement": "#F0B860", "tonalRamp": ["#1A1205", "#5A3808", "#A8680E", "#C98722", "#E2A642", "#F0B860", "#F6D59E", "#FCF0DC"] },
+      "bad":                { "role": "status",  "displayName": "Debt Red",         "canonical": "rgb(190 50 42)",   "dark": "rgb(240 112 100)", "onStatement": "#FF8A7E", "tonalRamp": ["#2A0B09", "#6A1C17", "#BE322A", "#D85046", "#F07064", "#FF8A7E", "#FBBDB6", "#FDE6E3"] },
+      "whatsapp":           { "role": "status",  "displayName": "WhatsApp Green",   "canonical": "rgb(22 140 70)",   "dark": "rgb(52 200 110)",  "tonalRamp": ["#07261A", "#0E4A2A", "#168C46", "#22AA58", "#34C86E", "#6ADA96", "#A9EBC2", "#E0F8EA"] },
+      "statement-charcoal": { "role": "neutral", "displayName": "Statement Charcoal", "canonical": "linear-gradient(160deg, #2A2B30 0%, #1C1D21 55%, #17181B 100%)", "dark": "linear-gradient(160deg, #23252B 0%, #191B20 60%, #15171B 100%)", "tonalRamp": ["#15171B", "#17181B", "#1C1D21", "#2A2B30", "#2F3036", "#4A4B50", "#9EA3AD", "#EEF0F3"] },
+      "statement-ink":      { "role": "neutral", "displayName": "Statement Ink",    "canonical": "#EEF0F3", "secondary": "#A9AEB8", "keys": "#9EA3AD", "tonalRamp": ["#4A4B50", "#626873", "#8C929D", "#9EA3AD", "#A9AEB8", "#D3D6DC", "#E6E8EC", "#EEF0F3"] }
+    },
+    "typographyMeta": {
+      "display":     { "displayName": "Ledger Figure", "purpose": "Ledger numbers: cash in box, owed, totals. 40px from 1024px. Always tabular, LTR-isolated, muted JD unit." },
+      "headline":    { "displayName": "Page Title",    "purpose": "One per screen. 26px from 1024px." },
+      "title":       { "displayName": "Secondary Figure", "purpose": "Secondary numbers such as the month landing figure." },
+      "section":     { "displayName": "Sheet Heading", "purpose": "Uppercase tracked heading inside every sheet header, in charcoal. In RTL: no case, no tracking, 13px." },
+      "body":        { "displayName": "Body",          "purpose": "Rows and forms. Row names at 700." },
+      "body-arabic": { "displayName": "Arabic Body",   "purpose": "Tajawal-first stack applied under dir=rtl." },
+      "sub":         { "displayName": "Sub-line",      "purpose": "Second line of a row, sheet header meta, in muted ink." },
+      "label":       { "displayName": "Label",         "purpose": "Field labels, ledger keys, tags. Uppercase in Latin only." }
+    },
+    "shadows": [
+      { "name": "statement-drop", "value": "0 22px 44px -30px rgba(12,14,20,.6)", "purpose": "The charcoal statement panel only." },
+      { "name": "card-in-hand", "value": "0 18px 40px -26px rgba(10,14,22,.55), inset 0 1px 0 rgba(255,255,255,.35)", "purpose": "The brushed-metal member card only." },
+      { "name": "focus-glow", "value": "0 0 0 3px rgb(var(--acc) / .22)", "purpose": "Input focus, with the border turning baby blue." },
+      { "name": "scrim", "value": "rgba(8,10,14,.5)", "purpose": "Behind bottom sheets and dialogs; .35 behind the assistant drawer." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(.16,1,.3,1)", "purpose": "The only signature easing: tally fill, stamp, sheen, sheet and drawer slide, toast, fade-in." },
+      { "name": "state", "value": "150ms", "purpose": "Hover and border/background transitions on rows, buttons, inputs." },
+      { "name": "press", "value": "transform 100ms, translateY(1px) on buttons, scale(.98) on attendance tiles", "purpose": "Tactile press feedback." },
+      { "name": "tally-fill", "value": "tick 420ms, scaleY(.2)->1, stagger 32ms per box", "purpose": "Tally boxes fill box by box on load." },
+      { "name": "stamp", "value": "380ms, scale(1.9) rotate(-12deg) -> none", "purpose": "Attendance mark stamping into a tapped tile." },
+      { "name": "sheen", "value": "1.6s once, 250ms delay", "purpose": "Single light pass across the member card; removed under reduced motion." },
+      { "name": "overlay", "value": "320ms translateY(24px)->0", "purpose": "Bottom sheet / dialog and assistant drawer entrance." }
+    ],
+    "breakpoints": [
+      { "name": "dialog", "value": "640px", "purpose": "Overlay switches from bottom sheet to centred dialog." },
+      { "name": "desk", "value": "1024px", "purpose": "Side rail replaces top and bottom bars; Display and Headline step up; two-column sheet pairs." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-ink",
+      "description": "Primary action at the end of a row or header: renew, approve, take attendance.",
+      "html": "<button class=\"ds-btn ds-btn-ink\">Renew</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:42px; padding:0 16px; border-radius:3px; font-family:Montserrat,Tajawal,system-ui,sans-serif; font-weight:700; font-size:14px; border:1px solid transparent; cursor:pointer; transition:background .15s, border-color .15s, color .15s, transform .1s; } .ds-btn:active { transform:translateY(1px); } .ds-btn:focus-visible { outline:2px solid #6EA3EE; outline-offset:2px; } .ds-btn-ink { background:#14161B; color:#FAFBFC; } .ds-btn-ink:hover { background:#4A4B50; }"
+    },
+    {
+      "name": "Line Button",
+      "kind": "button",
+      "refersTo": "button-line",
+      "description": "Secondary action: add player, edit, export, icon actions like WhatsApp in a row.",
+      "html": "<button class=\"ds-btn-line\">Add player</button>",
+      "css": ".ds-btn-line { display:inline-flex; align-items:center; gap:8px; height:34px; padding:0 12px; border-radius:3px; font-family:Montserrat,Tajawal,system-ui,sans-serif; font-weight:700; font-size:13px; background:#FAFBFC; color:#14161B; border:1px solid #B0B6C0; cursor:pointer; transition:border-color .15s, transform .1s; } .ds-btn-line:hover { border-color:#4A4B50; } .ds-btn-line:active { transform:translateY(1px); } .ds-btn-line:focus-visible { outline:2px solid #6EA3EE; outline-offset:2px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive action inside an edit area.",
+      "html": "<button class=\"ds-btn-danger\">Delete payment</button>",
+      "css": ".ds-btn-danger { display:inline-flex; align-items:center; height:28px; padding:0 9px; border-radius:3px; font-family:Montserrat,system-ui,sans-serif; font-weight:700; font-size:12px; color:#BE322A; background:transparent; border:1px solid rgba(190,50,42,.45); cursor:pointer; transition:background .15s; } .ds-btn-danger:hover { background:rgba(190,50,42,.08); } .ds-btn-danger:focus-visible { outline:2px solid #6EA3EE; outline-offset:2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Label above a 44px hairline input with a baby-blue focus glow.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-label\">Amount paid</span><input class=\"ds-inp\" placeholder=\"20\"></label>",
+      "css": ".ds-field { display:block; font-family:Montserrat,Tajawal,system-ui,sans-serif; } .ds-label { display:block; margin-bottom:6px; font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#626873; } .ds-inp { width:100%; height:44px; background:#FAFBFC; color:#14161B; border:1px solid #B0B6C0; border-radius:3px; padding:0 12px; font:inherit; font-size:15px; font-weight:500; caret-color:#2660BA; transition:border-color .15s, box-shadow .15s; } .ds-inp:hover { border-color:rgba(74,75,80,.6); } .ds-inp:focus { outline:none; border-color:#6EA3EE; box-shadow:0 0 0 3px rgba(110,163,238,.22); } .ds-inp::placeholder { color:#707680; }"
+    },
+    {
+      "name": "Filter Tabs",
+      "kind": "chip",
+      "refersTo": "tab",
+      "description": "Outlined 34px chips in a scrolling row; selected is solid graphite.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-tab ds-on\">Active <span class=\"ds-n\">42</span></button><button class=\"ds-tab\">Frozen <span class=\"ds-n\">3</span></button><button class=\"ds-tab\">Left <span class=\"ds-n\">7</span></button></div>",
+      "css": ".ds-chips { display:flex; gap:6px; } .ds-tab { flex:none; height:34px; padding:0 12px; display:inline-flex; align-items:center; gap:7px; border:1px solid #B0B6C0; border-radius:3px; font-family:Montserrat,system-ui,sans-serif; font-size:12.5px; font-weight:700; color:#4A4B50; background:#FAFBFC; cursor:pointer; } .ds-tab:hover { border-color:#4A4B50; } .ds-tab:focus-visible { outline:2px solid #6EA3EE; outline-offset:2px; } .ds-tab.ds-on { background:#14161B; border-color:#14161B; color:#FAFBFC; } .ds-n { font-variant-numeric:tabular-nums; opacity:.7; }"
+    },
+    {
+      "name": "Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Boxed scoresheet stamps for status.",
+      "html": "<span class=\"ds-tag ds-ok\">Paid</span> <span class=\"ds-tag ds-warn\">Renew soon</span> <span class=\"ds-tag ds-bad\">Owes</span> <span class=\"ds-tag ds-acc\">Frozen</span>",
+      "css": ".ds-tag { display:inline-flex; align-items:center; gap:5px; font-family:Montserrat,system-ui,sans-serif; font-size:11px; font-weight:700; line-height:1; padding:4px 7px; border:1px solid currentColor; border-radius:2px; letter-spacing:.02em; white-space:nowrap; } .ds-ok { color:#18804E; } .ds-warn { color:#A8680E; } .ds-bad { color:#BE322A; } .ds-acc { color:#2660BA; }"
+    },
+    {
+      "name": "Ruled Sheet with Rows",
+      "kind": "card",
+      "refersTo": "sheet",
+      "description": "The base container: hairline sheet, uppercase section header with meta, rows ending in their action.",
+      "html": "<section class=\"ds-sheet\"><div class=\"ds-hd\"><h2 class=\"ds-sec\">Money owed</h2><span class=\"ds-meta\">45 JD</span></div><div class=\"ds-rows\"><a class=\"ds-row\" href=\"#\"><span class=\"ds-mono\">LK</span><span class=\"ds-nm\">Laith Khaled<span class=\"ds-sub\">2 unpaid sessions</span></span><span class=\"ds-end\">25</span></a><a class=\"ds-row\" href=\"#\"><span class=\"ds-mono\">OS</span><span class=\"ds-nm\">Omar Saleh<span class=\"ds-sub\">Balance 20 JD</span></span><span class=\"ds-end\">20</span></a></div></section>",
+      "css": ".ds-sheet { font-family:Montserrat,Tajawal,system-ui,sans-serif; background:#FAFBFC; border:1px solid #D6DAE1; border-radius:4px; color:#14161B; max-width:420px; } .ds-hd { display:flex; align-items:center; gap:10px; padding:11px 16px; min-height:44px; border-bottom:1px solid #D6DAE1; } .ds-sec { margin:0; font-size:12px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#4A4B50; } .ds-meta { margin-inline-start:auto; font-size:12.5px; color:#626873; font-variant-numeric:tabular-nums; } .ds-rows > * + * { border-top:1px solid #E4E7EC; } .ds-row { display:flex; align-items:center; gap:12px; padding:11px 16px; min-height:52px; color:inherit; text-decoration:none; transition:background .15s; } .ds-row:hover { background:#F4F5F7; } .ds-row:focus-visible { outline:2px solid #6EA3EE; outline-offset:-2px; } .ds-mono { flex:none; width:36px; height:36px; border-radius:3px; display:grid; place-items:center; font-weight:800; font-size:13px; background:#E8EBEF; color:#4A4B50; } .ds-nm { flex:1; min-width:0; font-weight:700; font-size:15px; } .ds-sub { display:block; font-weight:500; font-size:12.5px; color:#BE322A; } .ds-end { margin-inline-start:auto; font-weight:700; font-variant-numeric:tabular-nums; }"
+    },
+    {
+      "name": "Session Tally",
+      "kind": "custom",
+      "refersTo": "tally",
+      "description": "The 12-session package as boxes: filled played, blue next, outlined left. Fills box by box on load.",
+      "html": "<span class=\"ds-tally\" role=\"img\" aria-label=\"7 / 12\"><i class=\"on\" style=\"--i:0\"></i><i class=\"on\" style=\"--i:1\"></i><i class=\"on\" style=\"--i:2\"></i><i class=\"on\" style=\"--i:3\"></i><i class=\"on\" style=\"--i:4\"></i><i class=\"on\" style=\"--i:5\"></i><i class=\"on\" style=\"--i:6\"></i><i class=\"nx\"></i><i></i><i></i><i></i><i></i></span>",
+      "css": ".ds-tally { display:inline-flex; gap:5px; direction:ltr; } .ds-tally i { width:16px; height:22px; border:2px solid #B0B6C0; border-radius:2px; display:block; } .ds-tally i.on { background:#4A4B50; border-color:#4A4B50; animation:ds-tick .42s cubic-bezier(.16,1,.3,1) both; animation-delay:calc(var(--i,0) * 32ms); } .ds-tally i.nx { border-color:#6EA3EE; box-shadow:inset 0 0 0 1.5px rgba(110,163,238,.25); } @keyframes ds-tick { from { transform:scaleY(.2); opacity:0; } to { transform:none; opacity:1; } } @media (prefers-reduced-motion: reduce) { .ds-tally i.on { animation:none; } }"
+    },
+    {
+      "name": "Statement Ledger",
+      "kind": "custom",
+      "refersTo": "statement",
+      "description": "Charcoal account header on the dashboard: logo charcoal, baby-blue top rule, Display figures in hairline-divided columns.",
+      "html": "<section class=\"ds-stmt\"><div class=\"ds-led\"><div><div class=\"ds-k\">Cash in box</div><div class=\"ds-v\">1,240<span class=\"ds-u\">JD</span></div><div class=\"ds-s\">After all costs</div></div><div><div class=\"ds-k\">Owed to you</div><div class=\"ds-v ds-hi\">185<span class=\"ds-u\">JD</span></div><div class=\"ds-s\">9 players</div></div></div></section>",
+      "css": ".ds-stmt { position:relative; overflow:hidden; max-width:480px; border-radius:6px; color:#EEF0F3; font-family:Montserrat,system-ui,sans-serif; background:linear-gradient(160deg, #2A2B30 0%, #1C1D21 55%, #17181B 100%); border:1px solid #2F3036; box-shadow:0 22px 44px -30px rgba(12,14,20,.6); } .ds-stmt::before { content:''; position:absolute; inset-inline:0; top:0; height:2px; background:#6EA3EE; } .ds-led { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); } .ds-led > * { padding:16px 16px 15px; } .ds-led > * + * { border-inline-start:1px solid rgba(255,255,255,.09); } .ds-k { font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#9EA3AD; } .ds-v { margin-top:8px; font-size:34px; font-weight:700; letter-spacing:-.02em; line-height:1; font-variant-numeric:tabular-nums lining-nums; } .ds-hi { color:#8DB8F3; } .ds-u { font-size:13px; font-weight:600; color:#A9AEB8; margin-inline-start:4px; letter-spacing:0; } .ds-s { margin-top:6px; font-size:12px; color:#A9AEB8; }"
+    },
+    {
+      "name": "Bottom Navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Phone bottom bar: icon over label; active item in ink with a baby-blue bar on the top rule.",
+      "html": "<nav class=\"ds-bb\"><a class=\"ds-nl ds-active\" href=\"#\"><svg width=\"21\" height=\"21\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\"/></svg>Today</a><a class=\"ds-nl\" href=\"#\"><svg width=\"21\" height=\"21\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 11l3 3 8-8\"/><path d=\"M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9\"/></svg>Attendance</a><a class=\"ds-nl\" href=\"#\"><svg width=\"21\" height=\"21\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"9\" cy=\"8\" r=\"4\"/><path d=\"M2 21v-1a6 6 0 0 1 12 0v1\"/><path d=\"M16 4a4 4 0 0 1 0 8M22 21v-1a6 6 0 0 0-4-5.7\"/></svg>Players</a></nav>",
+      "css": ".ds-bb { display:grid; grid-template-columns:repeat(3,1fr); max-width:420px; background:rgba(250,251,252,.96); border-top:1px solid #D6DAE1; font-family:Montserrat,system-ui,sans-serif; } .ds-nl { position:relative; display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 2px 8px; font-size:11px; font-weight:700; color:#626873; text-decoration:none; } .ds-nl:hover { color:#14161B; } .ds-nl:focus-visible { outline:2px solid #6EA3EE; outline-offset:-2px; } .ds-nl.ds-active { color:#14161B; } .ds-nl.ds-active::before { content:''; position:absolute; top:-1px; left:28%; right:28%; height:2px; background:#6EA3EE; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Platinum Scoresheet",
+    "overview": "Every screen is a page of the academy's official book: graphite ink on cool platinum paper, ruled into boxes by 1px hairlines, with big tabular numerals where a scorer would write the score. Structure comes from rules, not from floating cards; a section is a ruled sheet with a header line, and its content is a stack of rows separated by softer rules. Each row ends in its action.\n\nThe feel is premium and restrained, after a charge-card statement rather than a SaaS dashboard. Two objects are allowed to be physical: the charcoal **statement** panel that heads the dashboard (the account summary) and the brushed-metal **member card** on a player's page. Everything else lies flat on the paper. The baby blue of the logo's D is the only accent and it marks state (the next session, the active nav item, focus, links), never decoration.\n\nThe system is bilingual by construction: Montserrat (the logo's face) carries Latin text and every numeral; Tajawal carries Arabic. Numerals are always isolated LTR and tabular, so money and counts line up in both directions. Light and dark themes share one token set of RGB triplets.",
+    "keyCharacteristics": [
+      "Hairline-ruled sheets, 1px rules, corners of 2 to 4px.",
+      "Tabular Montserrat numerals as the loudest type on any screen.",
+      "One accent (baby blue), used for state only.",
+      "The 12-session package always drawn as a tally of boxes.",
+      "Two lifted objects only: the statement panel and the member card.",
+      "Full RTL with logical properties; uppercase tracking switches off in Arabic."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Baby blue appears only where something is next, active, focused or linked. If removing it would not lose information, it should not be there.", "section": "colors" },
+      { "name": "The Triplet Rule", "body": "Colors are defined once as RGB triplets on `:root` and `:root[data-theme=\"dark\"]` and consumed as `rgb(var(--token) / alpha)`. New surfaces use the variables, never fresh hex.", "section": "colors" },
+      { "name": "The Tabular Numeral Rule", "body": "Every number (money, counts, dates, percentages) carries the numeral class: Montserrat, tabular, LTR-isolated, with \"JD\" set as a smaller muted unit after it.", "section": "typography" },
+      { "name": "The Arabic Case Rule", "body": "In RTL, section headings, labels, tabs and ledger keys drop uppercase and tracking and step up to 13px. Uppercase tracking is a Latin device only.", "section": "typography" },
+      { "name": "The Flat Paper Rule", "body": "A sheet never casts a shadow. If a surface needs separation, give it a hairline or a tone step.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do build every section as a ruled sheet: 1px hairline, 4px corners, header line, rows divided by soft hairlines, each row ending in its action.",
+      "Do set every figure in tabular Montserrat with a muted \"JD\" unit, and use Display size for the numbers that answer the screen's question.",
+      "Do draw any session package as a tally of boxes, never as a percentage ring or a progress bar alone.",
+      "Do keep baby blue for next, active, focus and link states only.",
+      "Do use the RGB-triplet variables with alpha (`rgb(var(--bad) / .45)`) so both themes follow automatically.",
+      "Do use logical properties and check every screen in RTL, where tracking and uppercase switch off.",
+      "Do honour `prefers-reduced-motion`; the tally fill, stamp and sheen are the only signature motions, all eased with `cubic-bezier(.16,1,.3,1)`."
+    ],
+    "donts": [
+      "Don't put shadows on sheets, buttons or tiles; only the statement panel and the member card are lifted.",
+      "Don't use gradient KPI tiles or floating soft-shadow cards; ledgers are ruled columns on the sheet.",
+      "Don't use emojis anywhere; icons are inline SVG (`_icons.html`).",
+      "Don't round corners past 4px on ordinary surfaces, and don't use pill buttons.",
+      "Don't add a second accent hue, and don't use the status greens, ambers or reds for decoration.",
+      "Don't add a floating chat button; the assistant opens as a drawer from the search icon in the bar."
+    ]
+  }
+}

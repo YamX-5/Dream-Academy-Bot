@@ -1,43 +1,49 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_ui.html" import money %}
 {% block title %}{{ t('payments_title') }}{% endblock %}
 {% block content %}
-<h1 class="text-xl font-bold text-ink mb-4">{{ t('payments_title') }}</h1>
-
-<form method="get" class="flex gap-2 mb-4">
-  <select name="month" class="flex-1 bg-card border border-edge rounded-lg px-3 py-3 num focus:border-accent outline-none" onchange="this.form.submit()">
-    {% for m in months %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ m }}</option>{% endfor %}
-  </select>
-  <select name="method" class="bg-card border border-edge rounded-lg px-3 py-3 focus:border-accent outline-none" onchange="this.form.submit()">
-    <option value="">{{ t('all_methods') }}</option>
-    <option value="cash" {% if method=='cash' %}selected{% endif %}>{{ t('cash') }}</option>
-    <option value="cliq" {% if method=='cliq' %}selected{% endif %}>{{ t('cliq') }}</option>
-    <option value="other" {% if method=='other' %}selected{% endif %}>{{ t('other') }}</option>
-  </select>
-</form>
-
-<div class="bg-card rounded-lg p-4 border border-edge mb-4 flex justify-between items-center">
-  <div>
-    <div class="label-xs num">{{ t('month_total', m=month) }}</div>
-    <div class="text-2xl font-bold num text-ok mt-1">{{ total }} <span class="text-sm font-medium">JD</span></div>
+<div class="stack">
+  <div class="flex items-end gap-3 flex-wrap">
+    <h1 class="h-page">{{ t('payments_title') }}</h1>
+    <form method="get" class="ms-auto flex gap-2">
+      <select name="month" class="inp inp-sm num !w-auto" onchange="this.form.submit()" aria-label="{{ t('m_month') }}">
+        {% for m in months %}<option value="{{ m }}" {% if m==month %}selected{% endif %}>{{ m }}</option>{% endfor %}
+      </select>
+      <select name="method" class="inp inp-sm !w-auto" onchange="this.form.submit()" aria-label="{{ t('method') }}">
+        <option value="">{{ t('all_methods') }}</option>
+        <option value="cash" {% if method=='cash' %}selected{% endif %}>{{ t('cash') }}</option>
+        <option value="cliq" {% if method=='cliq' %}selected{% endif %}>{{ t('cliq') }}</option>
+        <option value="other" {% if method=='other' %}selected{% endif %}>{{ t('other') }}</option>
+      </select>
+    </form>
   </div>
-  <a href="/payments/export?month={{ month }}&method={{ method }}"
-     class="flex items-center gap-1.5 bg-accent hover:bg-accent2 text-bg font-semibold px-4 py-2 rounded-lg text-sm transition">
-    {{ icon('download','w-4 h-4') }}Excel</a>
-</div>
 
-<div class="bg-card rounded-lg border border-edge divide-y divide-edge2">
-  {% for r in rows %}
-  <div class="px-4 py-3 flex justify-between items-center">
-    <div>
-      <div class="font-semibold">{{ r.full_name }}</div>
-      <div class="text-xs text-dim num">{{ r.date }} · {{ t(r.method) if r.method in ['cash','cliq','other'] else r.method }}
-        · <a class="text-accent hover:underline" href="/receipt/{{ r.id }}">{{ r.receipt_no }}</a></div>
+  <section class="sheet">
+    <div class="ledger" style="--cols:2">
+      <div>
+        <div class="k num">{{ t('month_total', m=month) }}</div>
+        <div class="v big num">{{ money(total) }}<span class="u">JD</span></div>
+        <div class="s num">{{ t('m_n_payments', n=rows|length) }}</div>
+      </div>
+      <div class="flex items-center justify-center">
+        <a href="/payments/export?month={{ month }}&method={{ method }}" class="btn btn-line">{{ icon('download','w-4 h-4') }}Excel</a>
+      </div>
     </div>
-    <div class="font-semibold num text-ok">{{ r.amount }} JD</div>
-  </div>
-  {% else %}
-  <div class="px-4 py-8 text-center text-dim">{{ t('no_payments_month') }}</div>
-  {% endfor %}
+    <div class="rows ledger-rule">
+      {% for r in rows %}
+      <div class="row">
+        <div class="flex-1 min-w-0">
+          <a href="/players/{{ r.player_id }}" class="font-bold truncate block hover:text-accent">{{ r.full_name }}</a>
+          <div class="sub num">{{ r.date }} · {{ t(r.method) if r.method in ['cash','cliq','other'] else r.method }}{% if r.note %} · {{ r.note }}{% endif %}</div>
+        </div>
+        <a class="sub num hover:text-accent" href="/receipt/{{ r.id }}">{{ r.receipt_no }}</a>
+        <span class="num font-bold w-20 text-end">{{ money(r.amount) }}</span>
+      </div>
+      {% else %}
+      <div class="empty">{{ t('no_payments_month') }}</div>
+      {% endfor %}
+    </div>
+  </section>
 </div>
 {% endblock %}

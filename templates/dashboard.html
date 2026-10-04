@@ -1,136 +1,198 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_ui.html" import tally, money, initials, dmon %}
+{% from "_logo.html" import logo %}
 {% block title %}{{ t('dash_title') }}{% endblock %}
 {% block content %}
-{% set pal = ['#3D6FA3','#2E9E5B','#B5791E','#6D48C9','#C6413A','#1F8F8A'] %}
-{% macro avatar(name, id) %}{% set pp = name.split() %}<span class="av" style="background: {{ pal[id % 6] }}">{{ pp[0][0] }}{{ pp[1][0] if pp|length > 1 else '' }}</span>{% endmacro %}
+<div class="stack">
 
-<!-- compact hero -->
-<div class="gr-hero flex items-center gap-3 mb-3 !py-3 !px-4">
-  <div class="gr-pulse !w-10 !h-10">{{ icon('clock' if alerts else 'chart','w-5 h-5') }}</div>
-  <div class="min-w-0 flex-1">
-    {% if alerts %}
-    <div class="text-lg font-extrabold text-ink leading-tight"><span class="num text-warn">{{ alerts|length }}</span> {{ 'لاعب' if lang=='ar' else 'players' }} {{ t('hero_need_renewal') }}</div>
-    <div class="text-[11px] text-dim">{{ t('hero_renewal_sub') }}</div>
-    {% elif kpis.attendance_rate is not none %}
-    <div class="text-lg font-extrabold text-ink leading-tight"><span class="num text-ok">{{ kpis.attendance_rate }}%</span> {{ t('an_rate')|lower }}</div>
-    <div class="text-[11px] text-dim">{{ t('hero_att_sub') }}</div>
-    {% else %}
-    <div class="text-lg font-extrabold text-ink leading-tight">{{ t('hero_all_clear') }}</div>
-    <div class="text-[11px] text-dim">{{ t('hero_all_clear_sub') }}</div>
-    {% endif %}
-  </div>
-  <a href="/attendance" class="bg-accent text-bg font-bold px-3.5 py-2 rounded-md text-sm shrink-0">{{ t('hero_cta') }}</a>
-</div>
-
-<!-- compact stat strip (horizontal scroll) -->
-<div class="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1 mb-4" style="scrollbar-width:none">
-  {% macro stat(label, value, unit, cls, barcls) %}
-  <div class="kpi {{ barcls }} bg-card rounded-lg border border-edge px-3 py-2.5 shrink-0 min-w-[100px]">
-    <div class="label-xs mb-0.5">{{ label }}</div>
-    <div class="text-xl font-extrabold num {{ cls }}">{{ value }}{% if unit %}<span class="text-[11px] font-semibold"> {{ unit }}</span>{% endif %}</div>
-  </div>
-  {% endmacro %}
-  {{ stat(t('kpi_active'), kpis.active_players, '', 'text-ink', '') }}
-  {{ stat(t('kpi_present'), kpis.present_today, '', 'text-ink', 'kpi-ok') }}
-  {{ stat(t('fin_revenue'), fin.revenue, 'JD', 'text-ok', 'kpi-ok') }}
-  {{ stat(t('fin_profit'), fin.profit, 'JD', 'text-ok' if fin.profit >= 0 else 'text-bad', 'kpi-ok' if fin.profit >= 0 else 'kpi-bad') }}
-  {{ stat(t('fin_margin'), (fin.margin ~ '%') if fin.margin is not none else '—', '', 'text-ink', '') }}
-  {{ stat(t('kpi_unpaid'), kpis.unpaid_count, '', 'text-bad' if kpis.unpaid_count else 'text-ink', 'kpi-bad' if kpis.unpaid_count else '') }}
-</div>
-
-<!-- RADAR (the actionable core) -->
-<h2 class="flex items-center gap-2 font-bold mb-2 text-ink">
-  <span class="text-accent">{{ icon('alert','w-4 h-4') }}</span>{{ t('radar_title') }}
-</h2>
-<div class="grid gap-2.5 sm:grid-cols-3 mb-5">
-  <div class="gr-col violet">
-    <div class="hd"><span class="dot"></span><span class="t">{{ t('pending_approval') }}</span><span class="cnt num">{{ pending|length }}</span></div>
-    {% for p in pending %}
-    <div class="gr-row" id="pending-{{ p.id }}">
-      {{ avatar(p.full_name, p.id) }}
-      <a href="/players/{{ p.id }}/edit" class="flex-1 min-w-0">
-        <div class="font-bold text-sm truncate">{{ p.full_name }}</div>
-        <div class="text-[11px] text-dim truncate">{{ p.group_name or '—' }} · {{ t('added_by', who=(t('role_admin') if p.added_by=='admin' else t('role_coach'))) }}</div>
-      </a>
-      <div class="flex gap-1.5 shrink-0">
-        <button onclick="approvePlayer({{ p.id }})" title="{{ t('approve') }}" class="w-8 h-8 grid place-items-center rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition">{{ icon('check','w-4 h-4') }}</button>
-        <button onclick="rejectPlayer({{ p.id }})" title="{{ t('reject') }}" class="w-8 h-8 grid place-items-center rounded-lg bg-card2 hover:bg-card3 border border-edge text-bad transition">{{ icon('x','w-4 h-4') }}</button>
+  <!-- the day -->
+  <div class="flex items-end gap-3 flex-wrap">
+    <div class="min-w-0">
+      <h1 class="h-page" id="todayTitle" data-date="{{ today }}">{{ today }}</h1>
+      <div class="sub mt-1 flex items-center gap-2">
+        {% if today_training %}<span class="dot" style="background:rgb(var(--ok))"></span>{{ t('d_training_day') }}
+        {% else %}<span class="dot" style="background:rgb(var(--faint))"></span>{{ t('d_rest_day') }}{% endif %}
+        <span class="text-faint">·</span><span class="num">{{ kpis.present_today }}</span> {{ t('d_present_today') }}
       </div>
     </div>
-    {% else %}<div class="gr-empty">—</div>{% endfor %}
-  </div>
-  <div class="gr-col warn">
-    <div class="hd"><span class="dot"></span><span class="t">{{ t('renewal_alerts') }}</span><span class="cnt num">{{ alerts|length }}</span></div>
-    {% for a in alerts %}
-    <div class="gr-row">
-      {{ avatar(a.player.full_name, a.player.id) }}
-      <a href="/players/{{ a.player.id }}" class="flex-1 min-w-0">
-        <div class="font-bold text-sm truncate">{{ a.player.full_name }}</div>
-        <div class="text-[11px] num {{ 'text-warn' if a.active else 'text-bad' }} truncate">
-          {% if a.active %}{{ t('alert_left_days', n=a.left, d=a.days_left) }}{% else %}{{ t('expired_needs_renewal') }}{% endif %}</div>
-      </a>
-      {% if a.player.guardian_phone or a.player.phone %}
-      <a href="{{ a.wa }}" target="_blank" title="{{ t('whatsapp') }}" class="w-8 h-8 grid place-items-center rounded-lg text-white shrink-0 transition" style="background:#25D366">{{ icon('whatsapp','w-4 h-4') }}</a>
-      {% endif %}
+    <div class="ms-auto flex gap-2">
+      <a href="/players/new" class="btn btn-line btn-sm">{{ icon('plus','w-4 h-4') }}{{ t('d_add_player') }}</a>
+      <a href="/attendance" class="btn btn-ink btn-sm">{{ icon('attendance','w-4 h-4') }}{{ t('hero_cta') }}</a>
     </div>
-    {% else %}<div class="gr-empty">—</div>{% endfor %}
   </div>
-  <div class="gr-col bad">
-    <div class="hd"><span class="dot"></span><span class="t">{{ t('unpaid_title') }}</span><span class="cnt num">{{ unpaid|length }}</span></div>
-    {% for u in unpaid %}
-    <a href="/players/{{ u.pid }}" class="gr-row">
-      {{ avatar(u.full_name, u.pid) }}
-      <div class="flex-1 min-w-0">
-        <div class="font-bold text-sm truncate">{{ u.full_name }}</div>
-        <div class="text-[11px] text-dim num truncate">{{ t('attended_unpaid', d=u.session_date) }}</div>
+
+  <!-- statement: where the money stands right now -->
+  <section class="statement" aria-label="{{ t('d_money_now') }}">
+    <div class="st-hd">
+      {{ logo('w-[34px]') }}
+      <span class="label ms-1">{{ t('d_money_now') }}</span>
+      <span class="ms-auto label num" id="monthLabel" data-month="{{ month }}">{{ month }}</span>
+    </div>
+    {% set tot = [projection.received + projection.expected_in, projection.costs, 1]|max %}
+    <div class="ledger dash-led">
+      <div>
+        <div class="k">{{ t('d_cash_box') }}</div>
+        <div class="v big num {{ 'bad-hi' if balance < 0 else '' }}">{{ money(balance) }}<span class="u">JD</span></div>
+        <div class="s">{{ t('d_cash_box_sub') }}</div>
       </div>
+      <a href="#owed" class="block transition">
+        <div class="k">{{ t('d_owed') }}</div>
+        <div class="v big num {{ 'hi' if owed.total > 0 else '' }}">{{ money(owed.total) }}<span class="u">JD</span></div>
+        <div class="s num">{{ t('d_owed_sub', n=owed.rows|length) }}</div>
+      </a>
+      <!-- laptop: third column with the month's projection -->
+      <div class="hidden lg:block">
+        <div class="k">{{ t('d_month_lands') }}</div>
+        <div class="v big num {{ 'bad-hi' if projection.landing < 0 else 'ok-hi' }}">{{ '+' if projection.landing > 0 else '' }}{{ money(projection.landing) }}<span class="u">JD</span></div>
+        <div class="mt-2.5 grid gap-1.5 text-[12px]">
+          {% for lbl, val, col in [(t('d_received'), projection.received, '#6FD69E'), (t('d_expected'), projection.expected_in, '#6EA3EE'), (t('d_costs'), projection.costs, '#FF8A7E')] %}
+          <div class="flex items-center gap-2.5"><span class="w-24 shrink-0 text-dim">{{ lbl }}</span>
+            <div class="bar flex-1"><i style="width: {{ (val * 100 / tot)|round(1) }}%; background:{{ col }}"></i></div>
+            <span class="num w-12 text-end">{{ money(val) }}</span></div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <!-- phone: one line -->
+    <a href="/finance" class="lg:hidden ledger-rule border-t flex items-baseline gap-2 px-4 py-3">
+      <span class="label">{{ t('d_month_lands') }}</span>
+      <span class="mid num ms-auto {{ 'bad-hi' if projection.landing < 0 else 'ok-hi' }}">{{ '+' if projection.landing > 0 else '' }}{{ money(projection.landing) }}<span class="u text-[13px] font-semibold ms-1">JD</span></span>
     </a>
-    {% else %}<div class="gr-empty">—</div>{% endfor %}
-  </div>
-</div>
+  </section>
 
-{% if bdays %}
-<div class="bg-card rounded-lg px-3 py-1.5 border border-edge mb-4 divide-y divide-edge2">
-  <div class="flex items-center gap-2 py-1.5 text-xs font-semibold text-dim"><span class="text-accent">{{ icon('gift','w-3.5 h-3.5') }}</span>{{ t('birthdays') }}</div>
-  {% for b in bdays %}
-  <div class="flex justify-between items-center py-1.5 text-sm">
-    <a href="/players/{{ b.id }}" class="font-medium hover:text-accent transition">{{ b.full_name }}</a>
-    <span class="text-dim num">{{ b.birth_date[8:10] }}/{{ b.birth_date[5:7] }}</span>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
+  <div class="grid gap-4 lg:gap-5 lg:grid-cols-2 items-start">
+    <div class="stack">    <!-- renewals, ranked by days left -->
+      <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('renewal_alerts') }}</h2>
+        <span class="meta">{{ t('d_ranked') }}<a href="/players?renewal=1" class="text-accent font-bold">{{ t('see_all') }}</a></span></div>
+      <div class="rows">
+        {% for a in alerts[:8] %}
+        <div class="row stack-sm">
+          <a href="/players/{{ a.player.id }}" class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-bold truncate">{{ a.player.full_name }}</span>
+            </div>
+            <div class="mt-1.5 flex items-center gap-x-2.5 gap-y-1 flex-wrap">
+              {{ tally(a.used, a.total, warn=(a.left <= 2), dead=(not a.active)) }}
+              <span class="sub num {{ 'text-bad' if not a.active else ('text-warn' if a.left <= 2 else '') }}">
+                {% if a.active %}{{ t('d_left_days', n=a.left, d=a.days_left) }}{% else %}{{ t('expired_needs_renewal') }}{% endif %}</span>
+            </div>
+          </a>
+          <div class="end">
+            {% if a.player.guardian_phone or a.player.phone %}
+            <a href="{{ a.wa }}" target="_blank" rel="noopener" class="btn btn-line btn-sm btn-icon" title="{{ t('whatsapp') }}" aria-label="{{ t('whatsapp') }}">{{ icon('whatsapp','w-4 h-4') }}</a>
+            {% endif %}
+            <a href="/players/{{ a.player.id }}#renew" class="btn btn-ink btn-sm">{{ t('renew') }}</a>
+          </div>
+        </div>
+        {% else %}<div class="empty">{{ t('d_no_renewals') }}</div>{% endfor %}
+      </div>
+    </section>
 
-<!-- quick actions -->
-<div class="grid grid-cols-2 gap-2">
-  <a href="/finance" class="flex items-center gap-2 bg-card2 hover:bg-card3 border border-edge px-3 py-2.5 rounded-md text-sm font-semibold transition">
-    {{ icon('wallet','w-4 h-4') }}{{ t('nav_finance') }}</a>
-  <a href="/analytics" class="flex items-center gap-2 bg-card2 hover:bg-card3 border border-edge px-3 py-2.5 rounded-md text-sm font-semibold transition">
-    {{ icon('analytics','w-4 h-4') }}{{ t('nav_analytics') }}</a>
-  <a href="/payments" class="flex items-center gap-2 bg-card2 hover:bg-card3 border border-edge px-3 py-2.5 rounded-md text-sm font-semibold transition">
-    {{ icon('wallet','w-4 h-4') }}{{ t('nav_payments') }}</a>
-  <a href="/export/all" class="flex items-center gap-2 bg-accent text-bg px-3 py-2.5 rounded-md text-sm font-semibold transition">
-    {{ icon('download','w-4 h-4') }}{{ t('export_all') }}</a>
+      <!-- today's court + water -->
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('d_today_costs') }}</h2>
+      {% if today_costs %}<span class="meta num">{{ money(today_costs|sum(attribute='amount')) }} JD</span>{% endif %}</div>
+    {% if today_costs %}
+    <div class="rows">
+      {% for e in today_costs %}
+      <div class="row" style="min-height:44px">
+        <span class="flex-1">{{ e.note }}</span>
+        <span class="sub num">{{ (e.qty or 1)|round(1)|replace('.0','') }} × {{ money(e.unit_price if e.unit_price is not none else e.amount) }}</span>
+        <span class="num font-bold w-16 text-end">{{ money(e.amount) }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="sheet-ft"><a href="/finance#session-log" class="text-accent text-sm font-bold">{{ t('d_log_more') }}</a></div>
+    {% elif today_training %}
+    {% include "_session_log.html" %}
+    {% else %}
+    <div class="empty">{{ t('d_no_session_today') }} <a href="/finance#session-log" class="text-accent font-bold">{{ t('d_log_other_day') }}</a></div>
+    {% endif %}
+  </section>
+    </div>
+    <div class="stack">
+    <!-- money owed -->
+    <section class="sheet" id="owed">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('d_owed') }}</h2><span class="meta num">{{ money(owed.total) }} JD</span></div>
+      <div class="rows">
+        {% for r in owed.rows[:8] %}
+        <div class="row">
+          <a href="/players/{{ r.id }}" class="flex-1 min-w-0">
+            <div class="font-bold truncate">{{ r.name }}</div>
+            <div class="sub num">
+              {% if r.balance %}{{ t('d_balance_left', n=money(r.balance)) }}{% endif %}{% if r.balance and r.unpaid %} · {% endif %}
+              {% if r.unpaid %}<span class="text-bad">{{ t('d_unpaid_session' if r.unpaid == 1 else 'd_unpaid_sessions', n=r.unpaid) }}</span>{% endif %}
+            </div>
+          </a>
+          <div class="end">
+            <span class="num font-bold">{{ money(r.total) }}</span>
+            {% if r.wa %}<a href="{{ r.wa }}" target="_blank" rel="noopener" class="btn btn-line btn-sm btn-icon" title="{{ t('whatsapp') }}" aria-label="{{ t('whatsapp') }}">{{ icon('whatsapp','w-4 h-4') }}</a>{% endif %}
+          </div>
+        </div>
+        {% else %}<div class="empty">{{ t('d_nobody_owes') }}</div>{% endfor %}
+      </div>
+    </section>
+      {% if bdays %}
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('birthdays') }}</h2><span class="meta">{{ icon('gift','w-4 h-4') }}</span></div>
+    <div class="rows">
+      {% for b in bdays %}
+      <a href="/players/{{ b.id }}" class="row" style="min-height:44px"><span class="flex-1 font-semibold">{{ b.full_name }}</span>
+        <span class="sub num">{{ dmon(b.birth_date, lang) }}</span></a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+    </div>
+  </div>
+
+  {% if pending %}
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('pending_approval') }}</h2><span class="meta num">{{ pending|length }}</span></div>
+    <div class="rows">
+      {% for p in pending %}
+      <div class="row stack-sm" id="pending-{{ p.id }}">
+        {{ initials(p.full_name) }}
+        <a href="/players/{{ p.id }}/edit" class="flex-1 min-w-0">
+          <div class="font-bold truncate">{{ p.full_name }}</div>
+          <div class="sub truncate">{{ p.group_name or '-' }} · {{ t('added_by', who=(t('role_admin') if p.added_by=='admin' else t('role_coach'))) }}</div>
+        </a>
+        <div class="end">
+          <button onclick="rejectPlayer({{ p.id }})" class="btn btn-line btn-sm btn-icon" title="{{ t('reject') }}" aria-label="{{ t('reject') }}">{{ icon('x','w-4 h-4') }}</button>
+          <button onclick="approvePlayer({{ p.id }})" class="btn btn-ink btn-sm">{{ icon('check','w-4 h-4') }}{{ t('approve') }}</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="sheet grid grid-cols-4 text-center">
+    <a href="/players?status=active" class="py-3 hover:bg-card2"><div class="mid num !text-[19px]">{{ kpis.active_players }}</div><div class="label mt-1.5 !text-[10px] !tracking-[.03em] leading-tight px-1">{{ t('kpi_active') }}</div></a>
+    <a href="/players?status=frozen" class="py-3 border-s border-edge hover:bg-card2"><div class="mid num !text-[19px]">{{ frozen_count }}</div><div class="label mt-1.5 !text-[10px] !tracking-[.03em] leading-tight px-1">{{ t('st_frozen') }}</div></a>
+    <a href="/analytics" class="py-3 border-s border-edge hover:bg-card2"><div class="mid num !text-[19px]">{{ kpis.attendance_rate if kpis.attendance_rate is not none else '-' }}{% if kpis.attendance_rate is not none %}<span class="text-[12px]">%</span>{% endif %}</div><div class="label mt-1.5 !text-[10px] !tracking-[.03em] leading-tight px-1">{{ t('an_rate') }}</div></a>
+    <a href="/finance#coaches" class="py-3 border-s border-edge hover:bg-card2"><div class="mid num !text-[19px] {{ 'text-warn' if salaries_owed.total else '' }}">{{ money(salaries_owed.total) }}</div><div class="label mt-1.5 !text-[10px] !tracking-[.03em] leading-tight px-1">{{ t('d_salaries_due') }}</div></a>
+  </section>
+
+  <div class="flex gap-2 flex-wrap">
+    <a href="/payments" class="btn btn-line btn-sm">{{ icon('file','w-4 h-4') }}{{ t('nav_payments') }}</a>
+    <a href="/export/all" class="btn btn-line btn-sm">{{ icon('download','w-4 h-4') }}{{ t('export_all') }}</a>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+(function(){ // "Sunday, 4 October" in the reader's language
+  const el=document.getElementById('todayTitle'); const d=new Date(el.dataset.date+'T12:00:00');
+  el.textContent=d.toLocaleDateString({{ lang|tojson }}==='ar'?'ar-JO-u-nu-latn':'en-GB',{weekday:'long',day:'numeric',month:'long'});
+  const m=document.getElementById('monthLabel'); m.textContent=new Date(m.dataset.month+'-01T12:00:00').toLocaleDateString({{ lang|tojson }}==='ar'?'ar-JO-u-nu-latn':'en-GB',{month:'long',year:'numeric'});
+})();
 const CONFIRM_REJECT = {{ t('confirm_reject')|tojson }};
-async function approvePlayer(id) {
-  const r = await fetch(`/api/players/${id}/approve`, {method:'POST'});
-  if (r.ok) removeCard(id);
-}
-async function rejectPlayer(id) {
-  if (!confirm(CONFIRM_REJECT)) return;
-  const r = await fetch(`/api/players/${id}/reject`, {method:'POST'});
-  if (r.ok) removeCard(id);
-}
-function removeCard(id) {
-  const el = document.getElementById('pending-' + id);
-  if (el) el.remove();
-  if (!document.querySelector('[id^="pending-"]')) location.reload();
-}
+async function approvePlayer(id){ const r=await fetch(`/api/players/${id}/approve`,{method:'POST'}); if(r.ok) removeRow(id); }
+async function rejectPlayer(id){ if(!confirm(CONFIRM_REJECT)) return; const r=await fetch(`/api/players/${id}/reject`,{method:'POST'}); if(r.ok) removeRow(id); }
+function removeRow(id){ document.getElementById('pending-'+id)?.remove(); if(!document.querySelector('[id^="pending-"]')) location.reload(); }
 </script>
 {% endblock %}

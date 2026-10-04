@@ -1,0 +1,31 @@
+{# Shared scoresheet pieces. Import with: {% from "_ui.html" import tally, money, initials %} #}
+
+{# The package as N boxes: filled = sessions played, outlined = left, blue = next. #}
+{% macro tally(used, total, warn=False, dead=False, lg=False, anim=True) -%}
+{%- set total = (total or 0)|int -%}{%- set used = (used or 0)|int -%}
+<span class="tally{{ ' lg' if lg }}{{ ' warn' if warn }}{{ ' bad' if dead }}{{ ' tally-anim' if anim }}" role="img"
+      aria-label="{{ used }} / {{ total }}">
+  {%- for i in range(total if total <= 30 else 30) -%}<i class="{{ 'on' if i < used else ('nx' if i == used and not dead else '') }}"></i>{%- endfor -%}
+</span>
+{%- endmacro %}
+
+{# 20 -> "20", 12.5 -> "12.5", 1.666 -> "1.67", 1200 -> "1,200" #}
+{% macro money(v) -%}
+{%- set v = (v or 0)|float -%}
+{%- if v == v|round(0) -%}{{ '{:,.0f}'.format(v) }}{%- else -%}{{ '{:,.2f}'.format(v).rstrip('0').rstrip('.') }}{%- endif -%}
+{%- endmacro %}
+
+{% macro initials(name, size='') -%}
+{%- set pp = (name or '?').split() -%}
+<span class="mono {{ size }}" aria-hidden="true">{{ pp[0][0] }}{{ pp[1][0] if pp|length > 1 else '' }}</span>
+{%- endmacro %}
+
+{# One date language everywhere: "04 Oct" (day) and "Jul 2026" (month). #}
+{% macro dmon(iso, lang='en') -%}
+{%- if iso -%}{%- set M = ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'] if lang == 'ar' else ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] -%}
+{{ iso[8:10] }} {{ M[iso[5:7]|int - 1] }}{%- else -%}-{%- endif -%}
+{%- endmacro %}
+{% macro mony(iso, lang='en') -%}
+{%- if iso -%}{%- set M = ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'] if lang == 'ar' else ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] -%}
+{{ M[iso[5:7]|int - 1] }} {{ iso[:4] }}{%- else -%}-{%- endif -%}
+{%- endmacro %}

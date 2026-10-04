@@ -1,24 +1,29 @@
 {% extends "base.html" %}
-{% block title %}{{ t('login_btn') }} — Dream Academy{% endblock %}
+{% from "_logo.html" import logo %}
+{% block title %}{{ t('login_btn') }}{% endblock %}
 {% block content %}
-<div class="login-glow flex flex-col items-center justify-center min-h-[68vh] text-center">
-  <span class="brand-logo w-16 h-16 rounded-2xl grid place-items-center font-extrabold text-2xl mb-4">DA</span>
-  <div class="text-ink font-bold text-lg mb-1">Dream Academy</div>
-  <div class="text-dim text-xs mb-8">{{ t('console_sub') }}</div>
-  <form method="post" class="bg-card rounded-2xl p-6 w-full max-w-xs border border-edge">
-    <label for="pin" class="label-xs block mb-3 text-start">{{ t('enter_pin') }}</label>
-    <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autofocus
-           class="w-full text-center text-2xl tracking-[0.4em] num bg-bg border border-edge rounded-lg py-3 mb-4 focus:border-accent outline-none transition" />
-    {% if error %}<div class="text-bad text-sm mb-3" role="alert">{{ error }}</div>{% endif %}
-    <button class="w-full bg-accent text-bg font-bold py-3 rounded-lg transition">{{ t('login_btn') }}</button>
-  </form>
+<div class="min-h-[78vh] flex flex-col items-center justify-center fade-in">
+  <div class="w-full max-w-[360px]">
+    <div class="flex flex-col items-center text-center mb-8">
+      {{ logo('w-[120px]') }}
+      <span class="wordmark mt-4 !text-[14px]">DREAM ACADEMY</span>
+      <span class="sub mt-1.5">{{ t('console_sub') }}</span>
+    </div>
+    <form method="post" class="sheet">
+      <div class="sheet-bd !p-5">
+        <label for="pin" class="label block mb-2">{{ t('enter_pin') }}</label>
+        <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autofocus
+               autocomplete="current-password" aria-invalid="{{ 'true' if error else 'false' }}"
+               class="inp num text-center !h-14 !text-[26px] tracking-[0.5em] {{ '!border-bad' if error }}">
+        {% if error %}<div class="text-bad text-sm mt-2.5 font-semibold" role="alert">{{ error }}</div>{% endif %}
+        <button class="btn btn-ink btn-block mt-4 !h-12">{{ t('login_btn') }}</button>
+      </div>
+    </form>
+    <div class="flex justify-center gap-1 mt-5">
+      <button class="tb-btn" onclick="toggleTheme()" type="button" aria-label="Toggle theme"><span class="themeIcon"></span></button>
+      <a class="tb-txt" href="/lang/{{ 'ar' if lang == 'en' else 'en' }}">{{ 'عربي' if lang == 'en' else 'EN' }}</a>
+    </div>
+  </div>
 </div>
 {% endblock %}
-
-{% block head %}
-<style>
-  .login-glow { position: relative; }
-  .login-glow::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background: radial-gradient(900px 500px at 80% -10%, rgba(143,205,240,.16), transparent 60%); }
-</style>
-{% endblock %}
+{% block scripts %}<script>_syncTheme();</script>{% endblock %}

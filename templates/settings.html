@@ -1,173 +1,184 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
+{% from "_ui.html" import money %}
 {% block title %}{{ t('settings_title') }}{% endblock %}
-{% block content %}
-<h1 class="text-xl font-bold text-ink mb-4">{{ t('settings_title') }}</h1>
-{% if saved %}<div class="bg-ok/10 border border-emerald-500/50 text-ok rounded-lg px-4 py-3 mb-4" role="status">{{ t('saved') }}</div>{% endif %}
 
-{% if public_url %}
-<div class="bg-card rounded-lg p-4 border border-accent/40 mb-4 text-sm flex items-start gap-2">
-  <span class="text-accent mt-0.5">{{ icon('globe','w-4 h-4') }}</span>
-  <div>{{ t('public_url_note') }} <span dir="ltr" class="text-accent break-all num">{{ public_url }}</span>
-  — <a href="/qr" class="underline text-accent">{{ t('show_qr') }}</a></div>
+{% macro preset_row(p) %}
+<div class="grid grid-cols-12 gap-2 items-center" data-preset>
+  <input type="hidden" name="preset_key" value="{{ p.key if p else '' }}">
+  <input name="preset_name_en" value="{{ p.name_en if p else '' }}" placeholder="Name" class="inp inp-sm col-span-6 sm:col-span-3" aria-label="Name (EN)">
+  <input name="preset_name_ar" value="{{ p.name_ar if p else '' }}" placeholder="الاسم" dir="rtl" class="inp inp-sm col-span-6 sm:col-span-3" aria-label="الاسم">
+  <input name="preset_price" value="{{ p.price if p else '' }}" type="number" step="0.25" min="0" placeholder="JD" class="inp inp-sm num col-span-4 sm:col-span-2" aria-label="{{ t('amount') }}">
+  <select name="preset_category" class="inp inp-sm col-span-6 sm:col-span-3" aria-label="{{ t('expense_category') }}">
+    {% for c in categories %}<option value="{{ c }}" {% if p and p.category == c %}selected{% endif %}>{{ t('exp_cat_' ~ c) }}</option>{% endfor %}
+  </select>
+  <button type="button" class="btn btn-quiet btn-sm btn-icon col-span-2 sm:col-span-1 justify-self-end" onclick="this.closest('[data-preset]').remove()" aria-label="{{ t('delete') }}">{{ icon('x','w-4 h-4') }}</button>
 </div>
-{% endif %}
+{% endmacro %}
 
-<form method="post" class="space-y-3 mb-8">
-  <div class="grid grid-cols-3 gap-2">
-    <div><label class="label-xs">{{ t('monthly_price') }}</label>
-      <input name="monthly_price" type="number" step="0.5" value="{{ st.monthly_price }}" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none"/></div>
-    <div><label class="label-xs">{{ t('sessions_month') }}</label>
-      <input name="sessions_per_month" type="number" value="{{ st.sessions_per_month }}" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none"/></div>
-    <div><label class="label-xs">{{ t('expiry_days_lbl') }}</label>
-      <input name="expiry_days" type="number" value="{{ st.expiry_days }}" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none"/></div>
-  </div>
-  <label class="flex items-center gap-2 bg-card rounded-lg px-4 py-3 border border-edge text-sm">
-    <input type="checkbox" name="deduct_on_absence" {% if st.deduct_on_absence %}checked{% endif %} class="accent-accent">
-    {{ t('deduct_absence') }}
-  </label>
-  <div>
-    <label class="label-xs">{{ t('training_days') }}</label>
-    <div class="grid grid-cols-4 gap-1 mt-1 text-sm">
-      {% for d in all_days %}
-      <label class="flex items-center gap-1.5 bg-card rounded-lg px-2 py-2 border border-edge">
-        <input type="checkbox" name="training_days" value="{{ d }}" {% if d in st.training_days %}checked{% endif %} class="accent-accent">{{ t('day_' ~ d) }}
-      </label>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="grid grid-cols-3 gap-2">
-    <div><label class="label-xs">{{ t('academy_phone') }}</label>
-      <input name="academy_phone" value="{{ st.academy_phone }}" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none"/></div>
-    <div><label class="label-xs">{{ t('coach_pin') }}</label>
-      <input name="coach_pin" value="{{ st.coach_pin }}" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none"/></div>
-    <div><label class="label-xs">{{ t('admin_pin') }}</label>
-      <input name="admin_pin" value="{{ st.admin_pin }}" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none"/></div>
-  </div>
-  <div>
-    <label class="label-xs">{{ t('tpl_renewal') }}</label>
-    <textarea name="template_renewal" rows="3" dir="rtl" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">{{ st.template_renewal }}</textarea>
-  </div>
-  <div>
-    <label class="label-xs">{{ t('tpl_absence') }}</label>
-    <textarea name="template_absence" rows="2" dir="rtl" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">{{ st.template_absence }}</textarea>
-  </div>
+{% macro bundle_row(b) %}
+<div class="grid grid-cols-12 gap-2 items-center" data-bundle>
+  <input name="bundle_name_en" value="{{ b.name_en if b else '' }}" placeholder="Name" class="inp inp-sm col-span-6 sm:col-span-4" aria-label="Name (EN)">
+  <input name="bundle_name_ar" value="{{ b.name_ar if b else '' }}" dir="rtl" placeholder="الاسم" class="inp inp-sm col-span-6 sm:col-span-4" aria-label="الاسم">
+  <input name="bundle_sessions" value="{{ b.sessions if b else '' }}" type="number" min="1" placeholder="12" class="inp inp-sm num col-span-5 sm:col-span-2" aria-label="{{ t('sessions_count') }}">
+  <input name="bundle_price" value="{{ b.price if b else '' }}" type="number" step="0.5" min="0" placeholder="20" class="inp inp-sm num col-span-5 sm:col-span-1" aria-label="{{ t('amount') }}">
+  <button type="button" class="btn btn-quiet btn-sm btn-icon col-span-2 sm:col-span-1 justify-self-end" onclick="this.closest('[data-bundle]').remove()" aria-label="{{ t('delete') }}">{{ icon('x','w-4 h-4') }}</button>
+</div>
+{% endmacro %}
 
-  <div>
-    <label class="label-xs">{{ t('bundles_title') }}</label>
-    <div class="text-[11px] text-faint mb-2">{{ t('bundles_hint') }}</div>
-    <div id="bundleRows" class="space-y-2">
-      {% for b in st.bundles %}
-      <div class="grid grid-cols-12 gap-1.5 items-center">
-        <input name="bundle_name_en" value="{{ b.name_en }}" placeholder="Name" class="col-span-4 bg-card border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
-        <input name="bundle_name_ar" value="{{ b.name_ar }}" dir="rtl" placeholder="الاسم" class="col-span-4 bg-card border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">
-        <input name="bundle_sessions" value="{{ b.sessions }}" type="number" title="{{ t('sessions_count') }}" class="col-span-2 bg-card border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
-        <input name="bundle_price" value="{{ b.price }}" type="number" step="0.5" title="{{ t('amount') }}" class="col-span-2 bg-card border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">
+{% block content %}
+<div class="stack">
+  <h1 class="h-page">{{ t('settings_title') }}</h1>
+  {% if saved %}<div class="sheet px-4 py-3 text-ok font-semibold flex items-center gap-2" role="status">{{ icon('check','w-4 h-4') }}{{ t('saved') }}</div>{% endif %}
+
+  {% if public_url %}
+  <div class="sheet px-4 py-3 text-[13.5px] flex items-start gap-2.5">
+    <span class="text-accent mt-0.5">{{ icon('globe','w-4 h-4') }}</span>
+    <div class="min-w-0">{{ t('public_url_note') }} <span dir="ltr" class="text-accent break-all num">{{ public_url }}</span>
+      · <a href="/qr" class="text-accent font-bold">{{ t('show_qr') }}</a></div>
+  </div>
+  {% endif %}
+
+  <form method="post" id="settingsForm" class="stack">
+    <!-- package defaults -->
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('m_pricing') }}</h2></div>
+      <div class="sheet-bd grid grid-cols-3 gap-3">
+        <label class="field"><span class="label">{{ t('monthly_price') }}</span>
+          <input name="monthly_price" type="number" step="0.5" value="{{ st.monthly_price }}" class="inp num"></label>
+        <label class="field"><span class="label">{{ t('sessions_month') }}</span>
+          <input name="sessions_per_month" type="number" value="{{ st.sessions_per_month }}" class="inp num"></label>
+        <label class="field"><span class="label">{{ t('expiry_days_lbl') }}</span>
+          <input name="expiry_days" type="number" value="{{ st.expiry_days }}" class="inp num"></label>
+        <label class="field col-span-3 sm:col-span-1"><span class="label">{{ t('m_opening_balance') }}</span>
+          <input name="opening_balance" type="number" step="0.5" value="{{ st.opening_balance or 0 }}" class="inp num"></label>
+        <p class="sub col-span-3 sm:col-span-2 self-end pb-2">{{ t('m_opening_balance_hint') }}</p>
       </div>
+      <div class="sheet-bd ledger-rule">
+        <div class="label mb-1">{{ t('bundles_title') }}</div>
+        <p class="sub mb-3">{{ t('bundles_hint') }}</p>
+        <div id="bundleRows" class="grid gap-2">{% for b in st.bundles %}{{ bundle_row(b) }}{% endfor %}</div>
+        <button type="button" onclick="addRow('bundleRows','tplBundle')" class="btn btn-line btn-xs mt-3">{{ icon('plus','w-3.5 h-3.5') }}{{ t('add_bundle') }}</button>
+      </div>
+    </section>
+
+    <!-- training days -->
+    <section class="sheet" id="schedule">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('training_days') }}</h2></div>
+      <div class="sheet-bd">
+        <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+          {% for d in all_days %}
+          <label class="relative">
+            <input type="checkbox" name="training_days" value="{{ d }}" {% if d in st.training_days %}checked{% endif %} class="peer sr-only">
+            <span class="da-tab w-full justify-center peer-checked:bg-ink peer-checked:text-card peer-checked:border-ink peer-focus-visible:outline peer-focus-visible:outline-2">{{ t('day_' ~ d) }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="grid grid-cols-2 gap-3 mt-4 items-end">
+          <label class="field"><span class="label">{{ t('m_effective_from') }}</span>
+            <input type="date" name="days_from" value="{{ today }}" class="inp num"></label>
+          <p class="sub pb-2">{{ t('m_effective_hint') }}</p>
+        </div>
+      </div>
+      {% if history %}
+      <div class="sheet-hd ledger-rule" style="min-height:38px"><h3 class="label">{{ t('m_schedule_history') }}</h3></div>
+      <div class="rows">
+        {% for h in history %}
+        <div class="row" style="min-height:42px">
+          <span class="num w-28 shrink-0 sub">{{ t('m_from_start') if h['from'] <= '2000-01-01' else h['from'] }}</span>
+          <span class="flex-1 text-[13.5px]">{% for d in h.days %}{{ t('day_' ~ d) }}{{ ' · ' if not loop.last }}{% else %}-{% endfor %}</span>
+          {% if loop.first %}<span class="tag {{ 'tag-acc' if h['from'] > today else 'tag-ok' }}">{{ t('m_upcoming') if h['from'] > today else t('m_current') }}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- session cost presets -->
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('m_presets') }}</h2></div>
+      <div class="sheet-bd">
+        <p class="sub mb-3">{{ t('m_presets_hint') }}</p>
+        <div id="presetRows" class="grid gap-2">{% for p in st.cost_presets or [] %}{{ preset_row(p) }}{% endfor %}</div>
+        <button type="button" onclick="addRow('presetRows','tplPreset')" class="btn btn-line btn-xs mt-3">{{ icon('plus','w-3.5 h-3.5') }}{{ t('m_add_preset') }}</button>
+      </div>
+    </section>
+
+    <!-- access + messages -->
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('m_access') }}</h2></div>
+      <div class="sheet-bd grid grid-cols-3 gap-3">
+        <label class="field"><span class="label">{{ t('academy_phone') }}</span>
+          <input name="academy_phone" value="{{ st.academy_phone }}" inputmode="tel" class="inp num"></label>
+        <label class="field"><span class="label">{{ t('coach_pin') }}</span>
+          <input name="coach_pin" value="{{ st.coach_pin }}" inputmode="numeric" class="inp num"></label>
+        <label class="field"><span class="label">{{ t('admin_pin') }}</span>
+          <input name="admin_pin" value="{{ st.admin_pin }}" inputmode="numeric" class="inp num"></label>
+      </div>
+      <div class="sheet-bd ledger-rule grid gap-3">
+        <label class="field"><span class="label">{{ t('tpl_renewal') }}</span>
+          <textarea name="template_renewal" rows="3" dir="rtl" class="inp">{{ st.template_renewal }}</textarea></label>
+        <label class="field"><span class="label">{{ t('tpl_absence') }}</span>
+          <textarea name="template_absence" rows="2" dir="rtl" class="inp">{{ st.template_absence }}</textarea></label>
+        <label class="check"><input type="checkbox" name="deduct_on_absence" {% if st.deduct_on_absence %}checked{% endif %}> {{ t('deduct_absence') }}</label>
+      </div>
+    </section>
+
+    <div class="sticky bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 z-10">
+      <button class="btn btn-ink btn-block">{{ t('save_settings') }}</button>
+    </div>
+  </form>
+
+  <!-- days off: separate forms, saved immediately -->
+  <section class="sheet" id="daysoff">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('m_days_off') }}</h2></div>
+    <form method="post" action="/settings/closed-days" class="sheet-bd grid grid-cols-12 gap-2 items-end">
+      <label class="field col-span-5 sm:col-span-4"><span class="label">{{ t('date') }}</span>
+        <input type="date" name="date" required class="inp inp-sm num"></label>
+      <label class="field col-span-7 sm:col-span-6"><span class="label">{{ t('note') }}</span>
+        <input name="note" maxlength="60" placeholder="{{ t('m_day_off_ph') }}" class="inp inp-sm"></label>
+      <button class="btn btn-ink btn-sm col-span-12 sm:col-span-2">{{ t('add') }}</button>
+      <p class="sub col-span-12">{{ t('m_days_off_hint') }}</p>
+    </form>
+    <div class="rows ledger-rule">
+      {% for c in closed %}
+      <div class="row" style="min-height:42px">
+        <span class="num w-28 shrink-0">{{ c.date }}</span>
+        <span class="flex-1 sub truncate">{{ c.note }}</span>
+        <form method="post" action="/settings/closed-days">
+          <input type="hidden" name="date" value="{{ c.date }}"><input type="hidden" name="remove" value="1">
+          <button class="btn btn-quiet btn-xs">{{ t('delete') }}</button></form>
+      </div>
+      {% else %}<div class="empty">{{ t('m_no_days_off') }}</div>{% endfor %}
+    </div>
+  </section>
+
+  <!-- groups live on their own page now -->
+  <section class="sheet">
+    <div class="sheet-hd"><h2 class="h-sec">{{ t('groups_title') }}</h2>
+      <a href="/groups" class="meta text-accent font-bold">{{ t('nav_groups') }}</a></div>
+    <div class="rows">
+      {% for g in groups %}
+      <a href="/groups" class="row" style="min-height:44px">
+        <span class="flex-1 font-semibold truncate">{{ g.name_ar if lang == 'ar' else g.name_en }}</span>
+        <span class="sub num">{{ g.time_slot or '-' }}</span>
+        <span class="sub num w-20 text-end">{{ t('players_in_group', n=g.player_count) }}</span>
+      </a>
       {% endfor %}
     </div>
-    <button type="button" onclick="addBundleRow()" class="mt-2 text-accent text-xs font-semibold">+ {{ t('add_bundle') }}</button>
-  </div>
+  </section>
+</div>
 
-  <button class="w-full bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('save_settings') }}</button>
-</form>
+<template id="tplBundle">{{ bundle_row(none) }}</template>
+<template id="tplPreset">{{ preset_row(none) }}</template>
+{% endblock %}
+
+{% block scripts %}
 <script>
-function addBundleRow(){
-  const w=document.getElementById('bundleRows');
-  const d=document.createElement('div'); d.className='grid grid-cols-12 gap-1.5 items-center';
-  d.innerHTML='<input name="bundle_name_en" placeholder="Name" class="col-span-4 bg-card border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">'
-    +'<input name="bundle_name_ar" dir="rtl" placeholder="الاسم" class="col-span-4 bg-card border border-edge rounded-md px-2 py-2 text-sm focus:border-accent outline-none">'
-    +'<input name="bundle_sessions" type="number" placeholder="12" class="col-span-2 bg-card border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">'
-    +'<input name="bundle_price" type="number" step="0.5" placeholder="20" class="col-span-2 bg-card border border-edge rounded-md px-2 py-2 text-sm num focus:border-accent outline-none">';
-  w.appendChild(d);
+function addRow(listId, tplId){
+  const node = document.getElementById(tplId).content.firstElementChild.cloneNode(true);
+  document.getElementById(listId).appendChild(node);
+  node.querySelector('input:not([type=hidden])')?.focus();
 }
 </script>
-
-<div class="flex items-center justify-between mb-2">
-  <h2 class="font-semibold text-ink">{{ t('groups_title') }}</h2>
-  <a href="/groups" class="text-xs text-accent font-semibold">{{ t('nav_groups') }} →</a>
-</div>
-<div class="space-y-2">
-  {% for g in groups %}
-  <details class="bg-card rounded-lg border {{ 'border-bad/50' if group_error == g.id else 'border-edge' }} group" {% if group_error == g.id %}open{% endif %}>
-    <summary class="px-4 py-3 flex items-center justify-between cursor-pointer select-none list-none">
-      <div class="min-w-0">
-        <div class="font-semibold truncate">{{ g.name_ar }} <span class="text-dim font-normal">/ {{ g.name_en }}</span></div>
-        <div class="text-xs text-dim num">{{ g.time_slot or '—' }} · {{ t('players_in_group', n=g.player_count) }}</div>
-      </div>
-      <svg class="w-4 h-4 text-dim shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-    </summary>
-    <div class="px-4 pb-4 pt-1 border-t border-edge space-y-3">
-      {% if group_error == g.id %}
-      <div class="text-bad text-xs bg-bad/10 border border-bad/30 rounded-lg px-3 py-2">{{ t('group_has_players', n=g.player_count) }}</div>
-      {% endif %}
-      <form method="post" action="/groups/save" class="space-y-3">
-        <input type="hidden" name="id" value="{{ g.id }}">
-        <div class="grid grid-cols-2 gap-2">
-          <div><label class="label-xs">{{ t('grp_name_ar') }}</label>
-            <input name="name_ar" value="{{ g.name_ar }}" dir="rtl" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none"></div>
-          <div><label class="label-xs">{{ t('grp_name_en') }}</label>
-            <input name="name_en" value="{{ g.name_en }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none"></div>
-        </div>
-        <div class="grid grid-cols-3 gap-2">
-          <div><label class="label-xs">{{ t('from_age') }}</label>
-            <input name="min_age" type="number" value="{{ g.min_age }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 num focus:border-accent outline-none"></div>
-          <div><label class="label-xs">{{ t('to_age') }}</label>
-            <input name="max_age" type="number" value="{{ g.max_age }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 num focus:border-accent outline-none"></div>
-          <div><label class="label-xs">{{ t('gender') }}</label>
-            <select name="gender" class="w-full bg-bg border border-edge rounded-lg px-2 py-2.5 mt-1 focus:border-accent outline-none">
-              <option value="mixed" {% if g.gender=='mixed' %}selected{% endif %}>{{ t('mixed') }}</option>
-              <option value="M" {% if g.gender=='M' %}selected{% endif %}>{{ t('males') }}</option>
-              <option value="F" {% if g.gender=='F' %}selected{% endif %}>{{ t('females') }}</option>
-            </select></div>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div><label class="label-xs">{{ t('training_days') }}</label>
-            <input name="schedule_days" value="{{ g.schedule_days }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="Sun/Tue/Thu"></div>
-          <div><label class="label-xs">{{ t('time_slot') }}</label>
-            <input name="time_slot" value="{{ g.time_slot }}" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="4:00–5:30"></div>
-        </div>
-        <button class="w-full bg-card2 hover:bg-card3 border border-edge rounded-lg py-2.5 transition font-medium">{{ t('save_group') }}</button>
-      </form>
-      <form method="post" action="/groups/{{ g.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_group')|tojson }})" class="text-center">
-        <button class="text-bad hover:text-bad text-xs font-medium transition">{{ t('delete_group') }}</button>
-      </form>
-    </div>
-  </details>
-  {% endfor %}
-
-  <details class="bg-card rounded-lg border border-dashed border-edge">
-    <summary class="px-4 py-3 flex items-center gap-2 cursor-pointer select-none list-none text-accent font-medium">
-      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-      {{ t('add_group') }}
-    </summary>
-    <div class="px-4 pb-4 pt-1 border-t border-edge">
-      <form method="post" action="/groups/save" class="space-y-3 mt-3">
-        <div class="grid grid-cols-2 gap-2">
-          <div><label class="label-xs">{{ t('grp_name_ar') }}</label>
-            <input name="name_ar" required dir="rtl" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="{{ t('new_group_ph') }}"></div>
-          <div><label class="label-xs">{{ t('grp_name_en') }}</label>
-            <input name="name_en" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none"></div>
-        </div>
-        <div class="grid grid-cols-3 gap-2">
-          <div><label class="label-xs">{{ t('from_age') }}</label>
-            <input name="min_age" type="number" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 num focus:border-accent outline-none"></div>
-          <div><label class="label-xs">{{ t('to_age') }}</label>
-            <input name="max_age" type="number" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 num focus:border-accent outline-none"></div>
-          <div><label class="label-xs">{{ t('gender') }}</label>
-            <select name="gender" class="w-full bg-bg border border-edge rounded-lg px-2 py-2.5 mt-1 focus:border-accent outline-none">
-              <option value="mixed">{{ t('mixed') }}</option><option value="M">{{ t('males') }}</option><option value="F">{{ t('females') }}</option>
-            </select></div>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div><label class="label-xs">{{ t('training_days') }}</label>
-            <input name="schedule_days" value="Sun/Tue/Thu" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none"></div>
-          <div><label class="label-xs">{{ t('time_slot') }}</label>
-            <input name="time_slot" class="w-full bg-bg border border-edge rounded-lg px-3 py-2.5 mt-1 focus:border-accent outline-none" placeholder="4:00–5:30"></div>
-        </div>
-        <button class="w-full bg-accent hover:bg-accent2 text-bg font-semibold rounded-lg py-2.5 transition">{{ t('add_group') }}</button>
-      </form>
-    </div>
-  </details>
-</div>
 {% endblock %}

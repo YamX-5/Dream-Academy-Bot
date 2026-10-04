@@ -2,9 +2,9 @@
 {% from "_icons.html" import icon %}
 {% block title %}{{ t('import_btn') }}{% endblock %}
 {% block content %}
-<div class="bg-card rounded-xl p-6 border border-edge text-center mt-10 max-w-md mx-auto">
-  <div class="mx-auto w-10 h-10 mb-3 text-accent">{{ icon('upload','w-10 h-10') }}</div>
-  <div class="mb-6">{{ msg }}</div>
-  <a href="/players" class="inline-block bg-accent hover:bg-accent2 text-bg font-semibold px-6 py-3 rounded-lg transition">{{ t('back_players') }}</a>
-</div>
+<section class="sheet max-w-[480px] mx-auto mt-6 fade-in">
+  <div class="sheet-hd"><span class="text-accent">{{ icon('upload','w-4 h-4') }}</span><h1 class="h-sec">{{ t('import_btn') }}</h1></div>
+  <div class="sheet-bd text-[15px] leading-relaxed">{{ msg }}</div>
+  <div class="sheet-ft"><a href="/players" class="btn btn-ink btn-sm ms-auto">{{ t('back_players') }}</a></div>
+</section>
 {% endblock %}

@@ -1,133 +1,124 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}{{ t('edit_player') if player else t('new_player_title') }}{% endblock %}
 {% block content %}
-<h1 class="text-xl font-bold text-ink mb-4">
-  {{ t('edit_player') if player else t('new_player_title') }}
-</h1>
-{% if error %}<div class="bg-bad/10 border border-bad/50 text-bad rounded-lg px-4 py-3 mb-4" role="alert">{{ error }}</div>{% endif %}
-<form method="post" class="space-y-3">
-  <div>
-    <label class="label-xs" for="full_name">{{ t('full_name') }}</label>
-    <input id="full_name" name="full_name" required value="{{ player.full_name if player else '' }}"
-           class="w-full bg-card border border-edge rounded-lg px-4 py-3 mt-1 focus:border-accent outline-none transition" />
+<div class="stack max-w-[720px]">
+  <div class="flex items-end gap-3">
+    <h1 class="h-page">{{ t('edit_player') if player else t('new_player_title') }}</h1>
+    <a href="{{ '/players/' ~ player.id if player else '/players' }}" class="ms-auto btn btn-quiet btn-sm">{{ t('cancel') }}</a>
   </div>
-  <div class="grid grid-cols-2 gap-2">
-    <div>
-      <label class="label-xs" for="birth_date">{{ t('birth_date') }}</label>
-      <input name="birth_date" id="birth_date" type="date" value="{{ player.birth_date if player else '' }}"
-             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none" />
-    </div>
-    <div>
-      <label class="label-xs" for="gender">{{ t('gender') }}</label>
-      <select name="gender" id="gender" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">
-        <option value="M" {% if player and player.gender=='M' %}selected{% endif %}>{{ t('male') }}</option>
-        <option value="F" {% if player and player.gender=='F' %}selected{% endif %}>{{ t('female') }}</option>
-      </select>
-    </div>
-  </div>
-  <div>
-    <label class="label-xs" for="group_id">{{ t('group') }} <span id="suggestNote" class="text-accent text-xs normal-case tracking-normal"></span></label>
-    <select name="group_id" id="group_id" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">
-      <option value="">—</option>
-      {% for g in groups %}
-      <option value="{{ g.id }}" {% if player and player.group_id==g.id %}selected{% endif %}>{{ g.name_ar if lang == 'ar' else g.name_en }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="grid grid-cols-2 gap-2">
-    <div>
-      <label class="label-xs" for="phone">{{ t('phone') }}</label>
-      <input id="phone" name="phone" value="{{ player.phone if player else '' }}" inputmode="tel"
-             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none" placeholder="07XXXXXXXX" />
-    </div>
-    <div>
-      <label class="label-xs" for="join_date">{{ t('joined') }}</label>
-      <input id="join_date" name="join_date" type="date" value="{{ player.join_date if player else today }}"
-             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none" />
-    </div>
-  </div>
-  <div class="grid grid-cols-2 gap-2">
-    <div>
-      <label class="label-xs" for="guardian_name">{{ t('guardian') }}</label>
-      <input id="guardian_name" name="guardian_name" value="{{ player.guardian_name if player else '' }}"
-             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none" />
-    </div>
-    <div>
-      <label class="label-xs" for="guardian_phone">{{ t('guardian_wa') }}</label>
-      <input id="guardian_phone" name="guardian_phone" value="{{ player.guardian_phone if player else '' }}" inputmode="tel"
-             pattern="07[0-9]{8}" placeholder="07XXXXXXXX"
-             class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 num focus:border-accent outline-none" />
-    </div>
-  </div>
-  <div>
-    <label class="label-xs" for="notes">{{ t('notes') }}</label>
-    <textarea id="notes" name="notes" rows="2" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">{{ player.notes if player else '' }}</textarea>
-  </div>
-  <div class="grid grid-cols-2 gap-2">
-    <div>
-      <label class="label-xs" for="status">{{ t('status') }}</label>
-      <select id="status" name="status" class="w-full bg-card border border-edge rounded-lg px-3 py-3 mt-1 focus:border-accent outline-none">
-        {% if player and player.status=='pending' %}<option value="pending" selected>{{ t('pending_badge') }}</option>{% endif %}
-        <option value="active" {% if not player or player.status=='active' %}selected{% endif %}>{{ t('st_active') }}</option>
-        <option value="frozen" {% if player and player.status=='frozen' %}selected{% endif %}>{{ t('st_frozen') }}</option>
-        <option value="left" {% if player and player.status=='left' %}selected{% endif %}>{{ t('st_left') }}</option>
-      </select>
-    </div>
-    <label class="flex items-center gap-2 mt-6 text-sm">
-      <input type="checkbox" name="trial_used" {% if (player and player.trial_used) or not player %}checked{% endif %} class="accent-accent"> {{ t('trial_used') }}
-    </label>
-  </div>
-  <div class="text-[11px] text-faint -mt-1">{{ t('trial_hint') }}</div>
+  {% if error %}<div class="sheet px-4 py-3 text-bad font-semibold" style="border-color:rgb(var(--bad) / .5)" role="alert">{{ error }}</div>{% endif %}
 
-  {% if not player %}
-  <!-- new player: start their subscription right away (they just paid) -->
-  <div class="bg-card border border-edge rounded-lg p-3.5">
-    <label class="flex items-center gap-2 font-semibold text-sm">
-      <input type="checkbox" name="create_sub" id="createSub" checked onchange="document.getElementById('subFields').classList.toggle('hidden', !this.checked)">
-      {{ t('start_subscription') }}
-    </label>
-    <div id="subFields" class="mt-3 space-y-2">
-      <div class="grid grid-cols-3 gap-2">
-        {% for b in settings.bundles %}
-        <button type="button" onclick="pickNewBundle({{ b.price }}, {{ b.sessions }}, this)"
-                class="bundle-opt bg-bg border border-edge rounded-md px-2 py-2 text-center transition hover:border-accent/60">
-          <div class="font-bold text-xs truncate">{{ b.name_ar if lang == 'ar' else b.name_en }}</div>
-          <div class="text-[10px] text-dim num">{{ b.sessions }} · {{ b.price }} JD</div>
-        </button>
-        {% endfor %}
+  <form method="post" class="stack" id="playerForm">
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('p_sec_player') }}</h2></div>
+      <div class="sheet-bd grid gap-4 sm:grid-cols-2">
+        <label class="field sm:col-span-2"><span class="label">{{ t('full_name') }}</span>
+          <input id="full_name" name="full_name" required value="{{ player.full_name if player else '' }}" class="inp" autocomplete="off"></label>
+        <label class="field"><span class="label">{{ t('birth_date') }}</span>
+          <input name="birth_date" id="birth_date" type="date" value="{{ player.birth_date if player else '' }}" class="inp num"></label>
+        <label class="field"><span class="label">{{ t('gender') }}</span>
+          <select name="gender" id="gender" class="inp">
+            <option value="M" {% if player and player.gender=='M' %}selected{% endif %}>{{ t('male') }}</option>
+            <option value="F" {% if player and player.gender=='F' %}selected{% endif %}>{{ t('female') }}</option>
+          </select></label>
+        <label class="field"><span class="label">{{ t('group') }} <span id="suggestNote" class="text-accent normal-case tracking-normal"></span></span>
+          <select name="group_id" id="group_id" class="inp">
+            <option value="">-</option>
+            {% for g in groups %}
+            <option value="{{ g.id }}" {% if player and player.group_id==g.id %}selected{% endif %}>{{ g.name_ar if lang == 'ar' else g.name_en }}{% if g.time_slot %} · {{ g.time_slot }}{% endif %}</option>
+            {% endfor %}
+          </select></label>
+        <label class="field"><span class="label">{{ t('joined') }}</span>
+          <input id="join_date" name="join_date" type="date" value="{{ player.join_date if player else today }}" class="inp num"></label>
       </div>
-      <div class="grid grid-cols-3 gap-2">
-        <div><label class="label-xs">{{ t('amount') }}</label>
-          <input id="subPrice" name="sub_price" type="number" step="0.5"
-                 value="{{ settings.bundles[0].price if settings.bundles else settings.monthly_price }}"
-                 class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num text-sm focus:border-accent outline-none"></div>
-        <div><label class="label-xs">{{ t('sessions_count') }}</label>
-          <input id="subSessions" name="sub_sessions" type="number"
-                 value="{{ settings.bundles[0].sessions if settings.bundles else settings.sessions_per_month }}"
-                 class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num text-sm focus:border-accent outline-none"></div>
-        <div><label class="label-xs">{{ t('method') }}</label>
-          <select name="sub_method" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 text-sm focus:border-accent outline-none">
-            <option value="cash">{{ t('cash') }}</option>
-            <option value="cliq">{{ t('cliq') }}</option>
-            <option value="other">{{ t('other') }}</option>
-          </select></div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('p_sec_contact') }}</h2></div>
+      <div class="sheet-bd grid gap-4 sm:grid-cols-2">
+        <label class="field"><span class="label">{{ t('guardian') }}</span>
+          <input id="guardian_name" name="guardian_name" value="{{ player.guardian_name if player else '' }}" class="inp"></label>
+        <label class="field"><span class="label">{{ t('guardian_wa') }}</span>
+          <input id="guardian_phone" name="guardian_phone" value="{{ player.guardian_phone if player else '' }}" inputmode="tel"
+                 pattern="07[0-9]{8}" placeholder="07XXXXXXXX" class="inp num" title="07XXXXXXXX"></label>
+        <label class="field"><span class="label">{{ t('phone') }}</span>
+          <input id="phone" name="phone" value="{{ player.phone if player else '' }}" inputmode="tel" placeholder="07XXXXXXXX" class="inp num"></label>
+        <label class="field sm:col-span-2"><span class="label">{{ t('notes') }}</span>
+          <textarea id="notes" name="notes" rows="2" class="inp">{{ player.notes if player else '' }}</textarea></label>
       </div>
-      <div><label class="label-xs">{{ t('sub_start') }}</label>
-        <input name="sub_start" type="date" value="{{ today }}" class="w-full bg-bg border border-edge rounded-md px-2 py-2 mt-0.5 num text-sm focus:border-accent outline-none"></div>
-      <div class="text-[11px] text-faint">{{ t('start_subscription_hint') }}</div>
-    </div>
-  </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-hd"><h2 class="h-sec">{{ t('status') }}</h2></div>
+      <div class="sheet-bd grid gap-4 sm:grid-cols-2 items-end">
+        <label class="field"><span class="label">{{ t('status') }}</span>
+          <select id="status" name="status" class="inp">
+            {% if player and player.status=='pending' %}<option value="pending" selected>{{ t('pending_badge') }}</option>{% endif %}
+            <option value="active" {% if not player or player.status=='active' %}selected{% endif %}>{{ t('st_active') }}</option>
+            <option value="frozen" {% if player and player.status=='frozen' %}selected{% endif %}>{{ t('st_frozen') }}</option>
+            <option value="left" {% if player and player.status=='left' %}selected{% endif %}>{{ t('st_left') }}</option>
+          </select></label>
+        <div>
+          <label class="check !py-0 h-[44px]"><input type="checkbox" name="trial_used" {% if (player and player.trial_used) or not player %}checked{% endif %}> {{ t('trial_used') }}</label>
+        </div>
+        <div class="sub sm:col-span-2 -mt-2">{{ t('trial_hint') }}{% if player %} {{ t('p_freeze_from_card') }}{% endif %}</div>
+      </div>
+    </section>
+
+    {% if not player %}
+    <!-- new player: they usually just paid, so start the package here -->
+    <section class="sheet">
+      <div class="sheet-hd">
+        <label class="check !py-0 font-bold"><input type="checkbox" name="create_sub" id="createSub" checked> {{ t('start_subscription') }}</label>
+      </div>
+      <div id="subFields" class="sheet-bd grid gap-4">
+        {% if settings.bundles %}
+        <div class="chips" role="group" aria-label="{{ t('bundle') }}">
+          {% for b in settings.bundles %}
+          <button type="button" class="da-tab bundle-opt {{ 'on' if loop.first }}" data-price="{{ b.price }}" data-sessions="{{ b.sessions }}">
+            {{ b.name_ar if lang == 'ar' else b.name_en }}<span class="n num">{{ b.sessions }} · {{ b.price }} JD</span></button>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="grid gap-4 grid-cols-2 sm:grid-cols-4">
+          <label class="field"><span class="label">{{ t('p_price') }}</span>
+            <input id="subPrice" name="sub_price" type="number" step="0.5" min="0" class="inp num"
+                   value="{{ settings.bundles[0].price if settings.bundles else settings.monthly_price }}"></label>
+          <label class="field"><span class="label">{{ t('p_paid_now') }}</span>
+            <input id="subPaid" name="sub_paid" type="number" step="0.5" min="0" class="inp num"
+                   value="{{ settings.bundles[0].price if settings.bundles else settings.monthly_price }}"></label>
+          <label class="field"><span class="label">{{ t('sessions_count') }}</span>
+            <input id="subSessions" name="sub_sessions" type="number" min="1" class="inp num"
+                   value="{{ settings.bundles[0].sessions if settings.bundles else settings.sessions_per_month }}"></label>
+          <label class="field"><span class="label">{{ t('method') }}</span>
+            <select name="sub_method" class="inp">
+              <option value="cash">{{ t('cash') }}</option><option value="cliq">{{ t('cliq') }}</option><option value="other">{{ t('other') }}</option>
+            </select></label>
+          <label class="field col-span-1 sm:col-span-2"><span class="label">{{ t('p_start_date') }}</span>
+            <input id="subStart" name="sub_start" type="date" value="{{ today }}" class="inp num"></label>
+          <label class="field col-span-1 sm:col-span-2"><span class="label">{{ t('p_pay_date') }}</span>
+            <input name="sub_pay_date" type="date" value="{{ today }}" max="{{ today }}" class="inp num"></label>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap text-[13.5px]">
+          <span class="dot" style="background:rgb(var(--acc))"></span>
+          <span id="subPreview" class="num font-semibold"></span>
+          <span id="subOwe" class="sub text-warn"></span>
+        </div>
+        <div class="sub">{{ t('start_subscription_hint') }}</div>
+      </div>
+    </section>
+    {% endif %}
+
+    <button class="btn btn-ink btn-block">{{ t('save') }}</button>
+  </form>
+
+  {% if player %}
+  <form method="post" action="/players/{{ player.id }}/delete" onsubmit="return confirm({{ t('confirm_delete_player')|tojson }})">
+    <button class="btn btn-danger btn-block">{{ t('delete_player') }}</button>
+  </form>
   {% endif %}
-
-  <button class="w-full bg-accent hover:bg-accent2 text-bg font-semibold py-3 rounded-lg transition">{{ t('save') }}</button>
-</form>
-{% if player %}
-<form method="post" action="/players/{{ player.id }}/delete" class="mt-4"
-      onsubmit="return confirm({{ t('confirm_delete_player')|tojson }})">
-  <button class="w-full bg-bad/10 hover:bg-bad/20 text-bad border border-bad/40 font-semibold py-2.5 rounded-lg text-sm transition">
-    {{ t('delete_player') }}</button>
-</form>
-{% endif %}
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -140,19 +131,43 @@ async function suggest() {
   if (!isNew || !bd.value) return;
   const r = await fetch(`/api/suggest-group?birth_date=${bd.value}&gender=${gen.value}`);
   const d = await r.json();
-  if (d.group_id) {
-    grp.value = d.group_id;
-    note.textContent = SUGGEST_NOTE;
-  }
+  if (d.group_id) { grp.value = d.group_id; note.textContent = SUGGEST_NOTE; }
 }
 bd.addEventListener('change', suggest);
 gen.addEventListener('change', suggest);
 
-function pickNewBundle(price, sessions, el) {
-  document.getElementById('subPrice').value = price;
-  document.getElementById('subSessions').value = sessions;
-  document.querySelectorAll('.bundle-opt').forEach(b => b.classList.remove('on'));
-  el.classList.add('on');
+{% if not player %}
+const LOCALE = {{ lang|tojson }} === 'ar' ? 'ar-JO' : 'en-GB';
+const T_PREVIEW = {{ t('p_preview')|tojson }}, T_OWE = {{ t('p_will_owe')|tojson }};
+const $ = id => document.getElementById(id);
+const fmt = iso => new Date(iso + 'T12:00:00').toLocaleDateString(LOCALE, {day:'numeric', month:'short'});
+let pv;
+function preview() {
+  clearTimeout(pv);
+  pv = setTimeout(async () => {
+    const n = parseInt($('subSessions').value) || 0, s = $('subStart').value;
+    if (!n || !s) { $('subPreview').textContent = ''; return; }
+    try {
+      const d = await (await fetch(`/api/sub-preview?start=${s}&sessions=${n}`)).json();
+      $('subPreview').textContent = d.first ? T_PREVIEW.replace('{n}', d.count).replace('{a}', fmt(d.first)).replace('{b}', fmt(d.end)) : '';
+    } catch (e) {}
+  }, 150);
 }
+function owe() {
+  const left = (parseFloat($('subPrice').value) || 0) - (parseFloat($('subPaid').value) || 0);
+  $('subOwe').textContent = left > 0 ? T_OWE.replace('{n}', Math.round(left * 100) / 100) : '';
+}
+document.querySelectorAll('.bundle-opt').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.bundle-opt').forEach(x => x.classList.toggle('on', x === b));
+  $('subPrice').value = b.dataset.price; $('subPaid').value = b.dataset.price; $('subSessions').value = b.dataset.sessions;
+  preview(); owe();
+}));
+let paidTouched = false;
+$('subPaid').addEventListener('input', () => { paidTouched = true; owe(); });
+$('subPrice').addEventListener('input', () => { if (!paidTouched) $('subPaid').value = $('subPrice').value; owe(); });
+['subSessions', 'subStart'].forEach(id => $(id).addEventListener('input', preview));
+$('createSub').addEventListener('change', e => $('subFields').classList.toggle('hidden', !e.target.checked));
+preview(); owe();
+{% endif %}
 </script>
 {% endblock %}

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Dream Academy — smart assistant.
+"""Dream Academy, smart assistant.
 
 NOT a real LLM. An Arabic/English normalization + intent-matching engine over
 the SQLite DB. Returns structured replies the chat drawer renders (player names
@@ -35,10 +35,10 @@ def _extract_int(text):
 
 
 SUGGESTIONS = {
-    "en": ["Who needs renewal?", "Revenue this month", "Who was absent today?",
-           "Attendance rate", "How many active players?", "Unpaid players", "Best revenue month"],
-    "ar": ["مين بدو تجديد؟", "قديش دخل هالشهر؟", "مين غاب اليوم؟",
-           "نسبة الحضور", "كم لاعب فعال؟", "مين ما دفع؟", "أفضل شهر بالإيراد"],
+    "en": ["Who needs renewal?", "Who owes money?", "Cash in the box", "Salaries due",
+           "Revenue this month", "Who was absent today?", "Frozen players", "Attendance rate"],
+    "ar": ["مين بده تجديد؟", "مين عليه مصاري؟", "قديش بالصندوق؟", "رواتب مستحقة",
+           "قديش دخل هالشهر؟", "مين غاب اليوم؟", "اللاعبين المجمدين", "نسبة الحضور"],
 }
 
 
@@ -62,6 +62,46 @@ def ask(con, raw, lang="en"):
     ar = lang == "ar"
     st = db.get_settings()
     month = date.today().strftime("%Y-%m")
+
+    # money owed (package balances + unpaid sessions)
+    if _has(t, "owe", "owed", "debt", "unpaid", "not paid", "balance due", "عليه", "عليهم", "دين", "ديون",
+            "ما دفع", "مش مدفوع"):
+        owed = db.money_owed(con, st)
+        if not owed["rows"]:
+            return _reply("ما في حدا عليه اشي." if ar else "Nobody owes anything.")
+        rows = []
+        for r in owed["rows"]:
+            bits = []
+            if r["balance"]:
+                bits.append((f"باقي {r['balance']:g} دينار" if ar else f"{r['balance']:g} JD balance"))
+            if r["unpaid"]:
+                bits.append((f"{r['unpaid']} حصص مش مدفوعة" if ar else f"{r['unpaid']} unpaid sessions"))
+            rows.append({"id": r["id"], "name": r["name"], "phone": r["phone"], "sub": " · ".join(bits)})
+        return _reply((f"إلكم {owed['total']:g} دينار عند {len(rows)} لاعب:" if ar
+                       else f"{owed['total']:g} JD owed by {len(rows)} players:"), rows, kind="owed")
+
+    # cash in the box
+    if _has(t, "cash", "box", "in hand", "صندوق", "كاش", "معنا", "رصيد"):
+        bal = db.cash_balance(con, st)
+        return _reply((f"المفروض بالصندوق هلأ: {bal:g} دينار (الواصل ناقص كل المصاريف والرواتب المدفوعة)." if ar
+                       else f"Cash that should be in the box: {bal:g} JD (received minus all costs and salaries paid)."))
+
+    # salaries
+    if _has(t, "salary", "salaries", "coach pay", "رواتب", "راتب", "معاش"):
+        s = db.salaries_unpaid(con)
+        if not s["rows"]:
+            return _reply("كل الرواتب مدفوعة." if ar else "All salaries are paid.")
+        lines = "\n".join(f"{r['name']} · {r['month']} · {r['left']:g}" for r in s["rows"])
+        return _reply((f"رواتب مستحقة {s['total']:g} دينار:\n{lines}" if ar
+                       else f"Salaries due: {s['total']:g} JD\n{lines}"))
+
+    # frozen
+    if _has(t, "frozen", "freeze", "مجمد", "مجمدين", "تجميد"):
+        rows = con.execute("SELECT * FROM players WHERE status='frozen' ORDER BY full_name").fetchall()
+        if not rows:
+            return _reply("ما في لاعبين مجمدين." if ar else "No frozen players.")
+        out = [_row(p, (f"مجمد من {p['frozen_at']}" if ar else f"frozen since {p['frozen_at']}")) for p in rows]
+        return _reply((f"{len(rows)} لاعب مجمد:" if ar else f"{len(rows)} frozen players:"), out, kind="frozen")
 
     # revenue
     if _has(t, "revenue", "income", "money", "earn", "دخل", "ايراد", "مقبوضات", "فلوس", "قبض") \
@@ -137,6 +177,8 @@ def ask(con, raw, lang="en"):
             if not sub:
                 rows.append(_row(p, ("اشتراكه خالص" if ar else "no active subscription")))
             else:
+                if date.fromisoformat(sub["start_date"]) > date.today():
+                    continue  # renewed in advance
                 left = sub["sessions_total"] - sub["sessions_used"]
                 dleft = (date.fromisoformat(sub["expiry_date"]) - date.today()).days
                 if left <= 2 or dleft <= days:
@@ -165,10 +207,13 @@ def ask(con, raw, lang="en"):
                               (d,)).fetchone()["c"]
         rev = con.execute("SELECT COALESCE(SUM(amount),0) s FROM payments WHERE date LIKE ?",
                           (month + "%",)).fetchone()["s"]
-        unpaid = con.execute("SELECT COUNT(*) c FROM attendance WHERE unpaid=1").fetchone()["c"]
+        owed = db.money_owed(con, st)["total"]
+        bal = db.cash_balance(con, st)
         if ar:
-            return _reply(f"ملخص اليوم:\nحاضرين اليوم: {present}\nإيراد الشهر: {rev:g} دينار\nغير مدفوع: {unpaid}")
-        return _reply(f"Today's summary:\nPresent today: {present}\nRevenue this month: {rev:g} JD\nUnpaid: {unpaid}")
+            return _reply(f"ملخص اليوم:\nحاضرين اليوم: {present}\nإيراد الشهر: {rev:g} دينار\n"
+                          f"إلكم عند الناس: {owed:g} دينار\nبالصندوق: {bal:g} دينار")
+        return _reply(f"Today's summary:\nPresent today: {present}\nRevenue this month: {rev:g} JD\n"
+                      f"Owed to you: {owed:g} JD\nCash in the box: {bal:g} JD")
 
     # player lookup by name
     hit = _find_player(con, t)
@@ -178,11 +223,11 @@ def ask(con, raw, lang="en"):
         if sub:
             left = sub["sessions_total"] - sub["sessions_used"]
             dleft = (date.fromisoformat(sub["expiry_date"]) - date.today()).days
-            line = (f"{p['full_name']} — ضل {left} حصص، بنتهي بعد {dleft} يوم." if ar
-                    else f"{p['full_name']} — {left} sessions left, expires in {dleft}d.")
+            line = (f"{p['full_name']}, ضل {left} حصص، بنتهي بعد {dleft} يوم." if ar
+                    else f"{p['full_name']}, {left} sessions left, expires in {dleft}d.")
         else:
-            line = (f"{p['full_name']} — ما عنده اشتراك فعال." if ar
-                    else f"{p['full_name']} — no active subscription.")
+            line = (f"{p['full_name']}, ما عنده اشتراك فعال." if ar
+                    else f"{p['full_name']}, no active subscription.")
         return _reply(line, [_row(p, "")], kind="player")
 
     return _reply(
